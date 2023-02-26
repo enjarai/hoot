@@ -1,0 +1,35 @@
+{
+	"schemaVersion": 1,
+	"id": "hoot",
+	"version": "${version}",
+	"name": "Under the Hoot",
+	"description": "This is an example description! Tell everyone what your mod is about!",
+	"authors": [
+		"Me!"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "",
+	"icon": "assets/hoot/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+          "nl.enjarai.hoot.Hoot"
+		],
+		"client": [
+		  "nl.enjarai.hoot.HootClient"
+		],
+		"fabric-datagen": [
+          "nl.enjarai.hoot.HootDataGenerator"
+		]
+	},
+	"mixins": [
+		"hoot.mixins.json"
+	],
+	"depends": {
+		"minecraft": "~1.19.3",
+		"fabric-api": "*"
+	}
+}
