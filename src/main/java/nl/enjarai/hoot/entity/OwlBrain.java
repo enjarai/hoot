@@ -3,6 +3,7 @@ package nl.enjarai.hoot.entity;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.mojang.datafixers.util.Pair;
+import net.minecraft.entity.EntityType;
 import net.minecraft.entity.ai.brain.Activity;
 import net.minecraft.entity.ai.brain.Brain;
 import net.minecraft.entity.ai.brain.MemoryModuleState;
@@ -10,6 +11,7 @@ import net.minecraft.entity.ai.brain.MemoryModuleType;
 import net.minecraft.entity.ai.brain.sensor.Sensor;
 import net.minecraft.entity.ai.brain.sensor.SensorType;
 import net.minecraft.entity.ai.brain.task.*;
+import net.minecraft.util.math.intprovider.UniformIntProvider;
 import nl.enjarai.hoot.registry.ModBrainModules;
 
 import java.util.List;
@@ -18,11 +20,12 @@ import java.util.Set;
 
 public class OwlBrain {
     protected static final List<SensorType<? extends Sensor<? super OwlEntity>>> SENSORS = List.of(
-            SensorType.NEAREST_PLAYERS
+            SensorType.NEAREST_PLAYERS, SensorType.NEAREST_LIVING_ENTITIES
     );
     protected static final List<MemoryModuleType<?>> MEMORY_MODULES = List.of(
             MemoryModuleType.LOOK_TARGET, MemoryModuleType.VISIBLE_MOBS, MemoryModuleType.WALK_TARGET,
-            ModBrainModules.HOME_LOCATION
+            ModBrainModules.HOME_LOCATION, MemoryModuleType.CANT_REACH_WALK_TARGET_SINCE, MemoryModuleType.PATH,
+            MemoryModuleType.IS_PANICKING
     );
 
     public static Brain<OwlEntity> create(Brain<OwlEntity> brain) {
@@ -43,13 +46,11 @@ public class OwlBrain {
         ));
     }
 
+    @SuppressWarnings("deprecation")
     private static void addIdleActivities(Brain<OwlEntity> brain) {
-        brain.setTaskList(Activity.IDLE,
+        brain.setTaskList(Activity.IDLE, 0,
                 ImmutableList.of(
-//                        Pair.of(4, new RandomTask<>(Map.of(MemoryModuleType.WALK_TARGET, MemoryModuleState.VALUE_ABSENT), List.of(
-//                                Pair.of(StrollTask.create(1.0f), 1),
-//                                Pair.of(GoTowardsLookTargetTask.create(1.0f, 3), 1)
-//                        )))
+                        FollowMobWithIntervalTask.follow(EntityType.PLAYER, 6.0f, UniformIntProvider.create(120, 240))
                 )
         );
     }

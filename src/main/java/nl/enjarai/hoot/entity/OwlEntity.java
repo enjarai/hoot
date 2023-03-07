@@ -8,6 +8,7 @@ import net.minecraft.entity.ai.brain.Brain;
 import net.minecraft.entity.ai.brain.MemoryModuleType;
 import net.minecraft.entity.ai.brain.sensor.Sensor;
 import net.minecraft.entity.ai.brain.sensor.SensorType;
+import net.minecraft.entity.ai.control.FlightMoveControl;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.data.DataTracker;
@@ -44,6 +45,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
 
     protected OwlEntity(EntityType<? extends OwlEntity> entityType, World world) {
         super(entityType, world);
+        moveControl = new FlightMoveControl(this, 20, true);
     }
 
     protected Brain.Profile<OwlEntity> createBrainProfile() {
@@ -80,7 +82,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     public void travel(Vec3d movementInput) {
         super.travel(movementInput);
 
-        var flying = false;
+        var flying = true;
         if (flying) {
             if (this.canMoveVoluntarily() || this.isLogicalSideForUpdatingMovement()) {
                 if (this.isTouchingWater()) {
