@@ -1,21 +1,19 @@
 package nl.enjarai.hoot.entity;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.mojang.datafixers.util.Pair;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.ai.brain.Activity;
 import net.minecraft.entity.ai.brain.Brain;
-import net.minecraft.entity.ai.brain.MemoryModuleState;
 import net.minecraft.entity.ai.brain.MemoryModuleType;
 import net.minecraft.entity.ai.brain.sensor.Sensor;
 import net.minecraft.entity.ai.brain.sensor.SensorType;
 import net.minecraft.entity.ai.brain.task.*;
+import net.minecraft.entity.mob.PiglinBruteEntity;
 import net.minecraft.util.math.intprovider.UniformIntProvider;
 import nl.enjarai.hoot.registry.ModBrainModules;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 public class OwlBrain {
@@ -48,9 +46,13 @@ public class OwlBrain {
 
     @SuppressWarnings("deprecation")
     private static void addIdleActivities(Brain<OwlEntity> brain) {
-        brain.setTaskList(Activity.IDLE, 0,
+        brain.setTaskList(Activity.IDLE, 10,
                 ImmutableList.of(
-                        FollowMobWithIntervalTask.follow(EntityType.PLAYER, 6.0f, UniformIntProvider.create(120, 240))
+                        new RandomTask<>(List.of(
+                                Pair.of(FollowMobWithIntervalTask.follow(EntityType.PLAYER, 6.0f, UniformIntProvider.create(120, 240)), 0),
+                                Pair.of(new WaitTask(30, 60), 1),
+                                Pair.of(StrollTask.create(0.8f), 2)
+                        ))
                 )
         );
     }
