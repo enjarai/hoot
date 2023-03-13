@@ -1,31 +1,30 @@
 package nl.enjarai.hoot.entity;
 
-import com.mojang.serialization.Dynamic;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.MovementType;
 import net.minecraft.entity.VariantHolder;
-import net.minecraft.entity.ai.brain.Brain;
-import net.minecraft.entity.ai.brain.MemoryModuleType;
-import net.minecraft.entity.ai.brain.sensor.Sensor;
-import net.minecraft.entity.ai.brain.sensor.SensorType;
 import net.minecraft.entity.ai.control.FlightMoveControl;
+import net.minecraft.entity.ai.goal.*;
+import net.minecraft.entity.ai.pathing.PathNodeType;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.mob.MobEntity;
+import net.minecraft.entity.passive.ParrotEntity;
 import net.minecraft.entity.passive.PassiveEntity;
 import net.minecraft.entity.passive.TameableEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import nl.enjarai.hoot.entity.ai.RobbedTreeGoal;
 import nl.enjarai.hoot.registry.ModRegistries;
 import org.jetbrains.annotations.Nullable;
 import software.bernie.geckolib.animatable.GeoEntity;
-import software.bernie.geckolib.constant.DefaultAnimations;
 import software.bernie.geckolib.core.animatable.GeoAnimatable;
 import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.core.animation.AnimatableManager;
@@ -35,8 +34,6 @@ import software.bernie.geckolib.core.animation.RawAnimation;
 import software.bernie.geckolib.core.object.PlayState;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
-import java.util.List;
-
 public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolder<OwlVariant> {
     private static final TrackedData<OwlVariant> VARIANT = 
             DataTracker.registerData(OwlEntity.class, ModRegistries.OWL_VARIANT_DATA);
@@ -45,21 +42,20 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
 
     protected OwlEntity(EntityType<? extends OwlEntity> entityType, World world) {
         super(entityType, world);
-        moveControl = new FlightMoveControl(this, 20, true);
-    }
-
-    protected Brain.Profile<OwlEntity> createBrainProfile() {
-        return Brain.createProfile(OwlBrain.MEMORY_MODULES, OwlBrain.SENSORS);
+        moveControl = new FlightMoveControl(this, 10, false);
+        this.setPathfindingPenalty(PathNodeType.DANGER_FIRE, -1.0f);
+        this.setPathfindingPenalty(PathNodeType.DAMAGE_FIRE, -1.0f);
     }
 
     @Override
-    protected Brain<?> deserializeBrain(Dynamic<?> dynamic) {
-        return OwlBrain.create(this.createBrainProfile().deserialize(dynamic));
-    }
-
-    @SuppressWarnings("unchecked")
-    public Brain<OwlEntity> getBrain() {
-        return (Brain<OwlEntity>) super.getBrain();
+    protected void initGoals() {
+        this.goalSelector.add(0, new EscapeDangerGoal(this, 1.25));
+        this.goalSelector.add(0, new SwimGoal(this));
+        this.goalSelector.add(1, new LookAtEntityGoal(this, PlayerEntity.class, 8.0f));
+        this.goalSelector.add(2, new SitGoal(this));
+        this.goalSelector.add(2, new FollowOwnerGoal(this, 1.0, 5.0f, 1.0f, true));
+        this.goalSelector.add(2, new RobbedTreeGoal(this, 1.0));
+        this.goalSelector.add(3, new FollowMobGoal(this, 1.0, 3.0f, 7.0f));
     }
 
     public static DefaultAttributeContainer.Builder createOwlAttributes() {
@@ -109,16 +105,6 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                 }
             }
         }
-    }
-
-    @Override
-    protected void mobTick() {
-        world.getProfiler().push("owlBrain");
-        getBrain().tick((ServerWorld) world, this);
-        world.getProfiler().swap("owlActivityUpdate");
-        OwlBrain.updateActivity(this);
-        world.getProfiler().pop();
-        super.mobTick();
     }
 
     @Nullable
