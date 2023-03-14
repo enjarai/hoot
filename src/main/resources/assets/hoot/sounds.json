@@ -1,0 +1,27 @@
+{
+  "entity.owl.ambient": {
+    "subtitle": "subtitles.hoot.owl.ambient",
+    "sounds": [
+      "hoot:entity/owl/ambient1",
+      "hoot:entity/owl/ambient2"
+    ]
+  },
+  "entity.owl.hurt": {
+    "subtitle": "subtitles.hoot.owl.hurt",
+    "sounds": [
+      "hoot:entity/owl/hurt"
+    ]
+  },
+  "entity.owl.death": {
+    "subtitle": "subtitles.hoot.owl.death",
+    "sounds": [
+      "hoot:entity/owl/death"
+    ]
+  },
+  "entity.owl.eat": {
+    "subtitle": "subtitles.hoot.owl.eat",
+    "sounds": [
+      "hoot:entity/owl/eat"
+    ]
+  }
+}

@@ -1,11 +1,11 @@
 package nl.enjarai.hoot;
 
 import net.fabricmc.api.ModInitializer;
-
 import net.minecraft.util.Identifier;
 import nl.enjarai.hoot.entity.ModEntities;
-import nl.enjarai.hoot.registry.ModBrainModules;
+import nl.enjarai.hoot.registry.ModItems;
 import nl.enjarai.hoot.registry.ModRegistries;
+import nl.enjarai.hoot.registry.ModSoundEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,8 +16,9 @@ public class Hoot implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		ModRegistries.init();
-		ModBrainModules.init();
+		ModSoundEvents.init();
 		ModEntities.init();
+		ModItems.init();
 	}
 
 	public static Identifier id(String path) {
