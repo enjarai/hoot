@@ -16,6 +16,7 @@ import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.passive.ParrotEntity;
 import net.minecraft.entity.passive.PassiveEntity;
+import net.minecraft.entity.passive.RabbitEntity;
 import net.minecraft.entity.passive.TameableEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.DyeItem;
@@ -80,6 +81,8 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         goalSelector.add(2, new FollowOwnerGoal(this, 1.0, 5.0f, 1.0f, true));
         goalSelector.add(2, new ParrotEntity.FlyOntoTreeGoal(this, 1.0));
         goalSelector.add(3, new FollowMobGoal(this, 1.0, 3.0f, 7.0f));
+        goalSelector.add(9, new AttackGoal(this));
+        targetSelector.add(1, new UntamedActiveTargetGoal<>(this, RabbitEntity.class, false, null));
     }
 
     @Override
@@ -95,7 +98,8 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         return MobEntity.createMobAttributes()
                 .add(EntityAttributes.GENERIC_MAX_HEALTH, 10.0f)
                 .add(EntityAttributes.GENERIC_FLYING_SPEED, 0.6f)
-                .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.2f);
+                .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.2f)
+                .add(EntityAttributes.GENERIC_ATTACK_DAMAGE, 3.0f);
     }
 
     @Override
