@@ -1,10 +1,7 @@
 package nl.enjarai.hoot.entity;
 
 import net.minecraft.block.BlockState;
-import net.minecraft.entity.EntityStatuses;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.Flutterer;
-import net.minecraft.entity.VariantHolder;
+import net.minecraft.entity.*;
 import net.minecraft.entity.ai.control.FlightMoveControl;
 import net.minecraft.entity.ai.goal.*;
 import net.minecraft.entity.ai.pathing.BirdNavigation;
@@ -17,6 +14,7 @@ import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.mob.MobEntity;
+import net.minecraft.entity.passive.ParrotEntity;
 import net.minecraft.entity.passive.PassiveEntity;
 import net.minecraft.entity.passive.TameableEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -36,8 +34,9 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.LocalDifficulty;
+import net.minecraft.world.ServerWorldAccess;
 import net.minecraft.world.World;
-import nl.enjarai.hoot.entity.ai.RobbedTreeGoal;
 import nl.enjarai.hoot.registry.ModRegistries;
 import nl.enjarai.hoot.registry.ModSoundEvents;
 import org.jetbrains.annotations.Nullable;
@@ -45,7 +44,6 @@ import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.core.animation.AnimatableManager;
 import software.bernie.geckolib.core.animation.AnimationController;
-import software.bernie.geckolib.core.object.PlayState;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
 import java.util.Set;
@@ -80,7 +78,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         goalSelector.add(1, new LookAtEntityGoal(this, PlayerEntity.class, 8.0f));
         goalSelector.add(2, new SitGoal(this));
         goalSelector.add(2, new FollowOwnerGoal(this, 1.0, 5.0f, 1.0f, true));
-        goalSelector.add(2, new RobbedTreeGoal(this, 1.0));
+        goalSelector.add(2, new ParrotEntity.FlyOntoTreeGoal(this, 1.0));
         goalSelector.add(3, new FollowMobGoal(this, 1.0, 3.0f, 7.0f));
     }
 
@@ -98,6 +96,16 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                 .add(EntityAttributes.GENERIC_MAX_HEALTH, 10.0f)
                 .add(EntityAttributes.GENERIC_FLYING_SPEED, 0.6f)
                 .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.2f);
+    }
+
+    @Override
+    public EntityData initialize(ServerWorldAccess world, LocalDifficulty difficulty, SpawnReason spawnReason, @Nullable EntityData entityData, @Nullable NbtCompound entityNbt) {
+        var biome = world.getBiome(getBlockPos());
+        setVariant(OwlVariant.fromBiome(biome));
+        if (entityData == null) {
+            entityData = new PassiveEntity.PassiveData(false);
+        }
+        return super.initialize(world, difficulty, spawnReason, entityData, entityNbt);
     }
 
     @Override
@@ -173,8 +181,8 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     }
 
     @Override
-    public void setVariant(OwlVariant catVariant) {
-        dataTracker.set(VARIANT, catVariant);
+    public void setVariant(OwlVariant variant) {
+        dataTracker.set(VARIANT, variant);
     }
 
     public DyeColor getCollarColor() {
@@ -239,7 +247,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     @Override
     protected void initDataTracker() {
         super.initDataTracker();
-        dataTracker.startTracking(VARIANT, ModRegistries.OWL_VARIANT.getOrThrow(OwlVariant.WOOD_OWL));
+        dataTracker.startTracking(VARIANT, ModRegistries.OWL_VARIANT.getOrThrow(OwlVariant.WOOD_OWL_KEY));
         dataTracker.startTracking(COLLAR_COLOR, DyeColor.RED.getId());
     }
 

@@ -28,6 +28,7 @@
 	"mixins": [
 		"hoot.mixins.json"
 	],
+	"accessWidener": "hoot.accesswidener",
 	"depends": {
 		"minecraft": "~1.19.3",
 		"fabric-api": "*"

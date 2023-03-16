@@ -37,6 +37,8 @@ loom {
             runDir "build/datagen"
         }
     }
+
+	accessWidenerPath = file("src/main/resources/hoot.accesswidener")
 }
 
 // Add the generated resources to the main source set
