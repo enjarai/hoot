@@ -1,5 +1,6 @@
 package nl.enjarai.hoot.entity;
 
+import com.mojang.datafixers.util.Pair;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.*;
 import net.minecraft.entity.ai.control.FlightMoveControl;
@@ -25,6 +26,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
@@ -38,6 +40,8 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.LocalDifficulty;
 import net.minecraft.world.ServerWorldAccess;
 import net.minecraft.world.World;
+import nl.enjarai.hoot.entity.ai.DeliveryNavigation;
+import nl.enjarai.hoot.entity.ai.TravelToDestinationGoal;
 import nl.enjarai.hoot.registry.ModRegistries;
 import nl.enjarai.hoot.registry.ModSoundEvents;
 import org.jetbrains.annotations.Nullable;
@@ -61,6 +65,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
 
 
     private final AnimatableInstanceCache animationCache = GeckoLibUtil.createInstanceCache(this);
+    public DeliveryNavigation deliveryNavigation;
     private float flapSpeed;
     private float flapping = 1.0f;
     private float nextFlap = 1.0f;
@@ -68,6 +73,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     protected OwlEntity(EntityType<? extends OwlEntity> entityType, World world) {
         super(entityType, world);
         moveControl = new FlightMoveControl(this, 10, false);
+        deliveryNavigation = new DeliveryNavigation();
         setPathfindingPenalty(PathNodeType.DANGER_FIRE, -1.0f);
         setPathfindingPenalty(PathNodeType.DAMAGE_FIRE, -1.0f);
     }
@@ -78,9 +84,10 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         goalSelector.add(0, new SwimGoal(this));
         goalSelector.add(1, new LookAtEntityGoal(this, PlayerEntity.class, 8.0f));
         goalSelector.add(2, new SitGoal(this));
-        goalSelector.add(2, new FollowOwnerGoal(this, 1.0, 5.0f, 1.0f, true));
-        goalSelector.add(2, new ParrotEntity.FlyOntoTreeGoal(this, 1.0));
-        goalSelector.add(3, new FollowMobGoal(this, 1.0, 3.0f, 7.0f));
+        goalSelector.add(3, new TravelToDestinationGoal(this, speed, teleportDistance));
+        goalSelector.add(4, new FollowOwnerGoal(this, 1.0, 5.0f, 1.0f, true));
+        goalSelector.add(4, new ParrotEntity.FlyOntoTreeGoal(this, 1.0));
+        goalSelector.add(5, new FollowMobGoal(this, 1.0, 3.0f, 7.0f));
         goalSelector.add(9, new AttackGoal(this));
         targetSelector.add(1, new UntamedActiveTargetGoal<>(this, RabbitEntity.class, false, null));
     }
@@ -261,6 +268,9 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         super.writeCustomDataToNbt(nbt);
         nbt.putString("variant", ModRegistries.OWL_VARIANT.getId(getVariant()).toString());
         nbt.putByte("CollarColor", (byte) getCollarColor().getId());
+        nbt.put("navigation", DeliveryNavigation.CODEC
+                .encodeStart(NbtOps.INSTANCE, deliveryNavigation)
+                .result().orElse(new NbtCompound()));
     }
 
     @Override
@@ -272,6 +282,11 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         }
         if (nbt.contains("CollarColor", NbtElement.NUMBER_TYPE)) {
             setCollarColor(DyeColor.byId(nbt.getInt("CollarColor")));
+        }
+        if (nbt.contains("navigation", NbtElement.COMPOUND_TYPE)) {
+            deliveryNavigation = DeliveryNavigation.CODEC
+                    .decode(NbtOps.INSTANCE, nbt.getCompound("navigation"))
+                    .result().map(Pair::getFirst).orElse(deliveryNavigation);
         }
     }
 
