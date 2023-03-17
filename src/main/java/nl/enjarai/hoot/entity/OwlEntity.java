@@ -206,6 +206,11 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     protected void fall(double heightDifference, boolean onGround, BlockState state, BlockPos landedPosition) {
     }
 
+    @Override
+    public boolean tryAttack(Entity target) {
+        return target.damage(DamageSource.mob(this), (float) getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE));
+    }
+
     @Nullable
     @Override
     protected SoundEvent getAmbientSound() {
