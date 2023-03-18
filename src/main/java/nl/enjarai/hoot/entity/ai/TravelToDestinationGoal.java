@@ -1,11 +1,12 @@
 package nl.enjarai.hoot.entity.ai;
 
 import net.minecraft.block.BlockState;
-import net.minecraft.block.Material;
 import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.BlockView;
 import nl.enjarai.hoot.entity.OwlEntity;
+
+import java.util.EnumSet;
 
 public class TravelToDestinationGoal extends Goal {
     private final OwlEntity entity;
@@ -16,24 +17,26 @@ public class TravelToDestinationGoal extends Goal {
         this.entity = entity;
         this.speed = speed;
         this.teleportDistance = teleportDistance;
+        this.setControls(EnumSet.of(Goal.Control.MOVE));
     }
 
     @Override
     public boolean canStart() {
-        return entity.deliveryNavigation.getState() != DeliveryNavigation.State.IDLE;
+        return entity.deliveryNavigation.getState() != DeliveryNavigation.State.IDLE &&
+                entity.deliveryNavigation.getDestination().isPresent() &&
+                entity.deliveryNavigation.getSource().isPresent();
     }
 
     @Override
     public void start() {
-        entity.getNavigation().startMovingTo(
-                entity.deliveryNavigation.getDestination().getX(),
-                entity.deliveryNavigation.getDestination().getY(),
-                entity.deliveryNavigation.getDestination().getZ(), speed);
+
     }
 
     @Override
     public boolean shouldContinue() {
-        return entity.getNavigation().isFollowingPath();
+        return entity.deliveryNavigation.getState() != DeliveryNavigation.State.IDLE &&
+                entity.deliveryNavigation.getDestination().isPresent() &&
+                entity.deliveryNavigation.getSource().isPresent();
     }
 
     @Override
@@ -43,15 +46,70 @@ public class TravelToDestinationGoal extends Goal {
 
     @Override
     public void tick() {
-        if (entity.squaredDistanceTo(entity.deliveryNavigation.getSource().toCenterPos()) > teleportDistance) {
-            var arrivalPos = entity.deliveryNavigation.getDestination().;
+        var nav = entity.deliveryNavigation;
+
+        if (nav.getDestination().isEmpty() || nav.getSource().isEmpty()) return;
+
+        var destination = nav.getDestination().get();
+        var source = nav.getSource().get();
+
+        entity.getNavigation().startMovingTo(
+                destination.getX(),
+                destination.getY(),
+                destination.getZ(),
+                speed
+        );
+
+        if (entity.squaredDistanceTo(destination.toCenterPos()) < 2 * 2) {
+            onDestinationReached();
+            return;
+        }
+
+        if (entity.squaredDistanceTo(source.toCenterPos()) > teleportDistance * teleportDistance &&
+                entity.squaredDistanceTo(destination.toCenterPos()) > (teleportDistance * 2) * (teleportDistance * 2)) {
+            var travelVec = source.toCenterPos().subtract(destination.toCenterPos());
+            var travelPos = new BlockPos(
+                    travelVec.normalize().multiply(teleportDistance).add(destination.toCenterPos()));
+
+            var checkRange = (int) teleportDistance;
+            for (var checkPos : BlockPos.iterateOutwards(travelPos, checkRange, checkRange, checkRange)) {
+                if (isSafe(entity.world, checkPos)) {
+                    entity.teleport(checkPos.getX(), checkPos.getY(), checkPos.getZ());
+                    return;
+                }
+            }
+
+            nav.setState(DeliveryNavigation.State.IDLE);
         }
     }
 
-    public boolean isSafe(BlockView world, int maxY) {
-        BlockPos blockPos = new BlockPos(this.x, (double)(this.getY(world, maxY) - 1), this.z);
-        BlockState blockState = world.getBlockState(blockPos);
-        Material material = blockState.getMaterial();
-        return blockPos.getY() < maxY && !material.isLiquid() && material != Material.FIRE;
+    private void onDestinationReached() {
+        var nav = entity.deliveryNavigation;
+
+        if (nav.getState() == DeliveryNavigation.State.DELIVERING) {
+            entity.onDeliver();
+
+            if (entity.getHome() != null) {
+                nav.setDestination(entity.getHome());
+            } else if (entity.getOwner() != null) {
+                nav.setDestination(entity.getOwner().getBlockPos());
+            } else if (nav.getSource().isPresent()) {
+                nav.setDestination(nav.getSource().get());
+            }
+
+            nav.setSource(entity.getBlockPos());
+            nav.setState(DeliveryNavigation.State.RETURNING);
+        } else if (nav.getState() == DeliveryNavigation.State.RETURNING) {
+            entity.onReturn();
+            nav.setDestination(null);
+            nav.setSource(null);
+            nav.setState(DeliveryNavigation.State.IDLE);
+        }
+        entity.getNavigation().stop();
+    }
+
+    public boolean isSafe(BlockView world, BlockPos pos) {
+        BlockState blockState = world.getBlockState(pos);
+        return blockState.isAir();
     }
 }

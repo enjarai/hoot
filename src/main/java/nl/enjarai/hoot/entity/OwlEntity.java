@@ -84,7 +84,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         goalSelector.add(0, new SwimGoal(this));
         goalSelector.add(1, new LookAtEntityGoal(this, PlayerEntity.class, 8.0f));
         goalSelector.add(2, new SitGoal(this));
-        goalSelector.add(3, new TravelToDestinationGoal(this, speed, teleportDistance));
+        goalSelector.add(3, new TravelToDestinationGoal(this, 1.5, 24));
         goalSelector.add(4, new FollowOwnerGoal(this, 1.0, 5.0f, 1.0f, true));
         goalSelector.add(4, new ParrotEntity.FlyOntoTreeGoal(this, 1.0));
         goalSelector.add(5, new FollowMobGoal(this, 1.0, 3.0f, 7.0f));
@@ -128,6 +128,14 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         }
 
         flapWings();
+    }
+
+    public void onDeliver() {
+
+    }
+
+    public void onReturn() {
+
     }
 
     @Override
@@ -202,6 +210,14 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
 
     public void setCollarColor(DyeColor color) {
         dataTracker.set(COLLAR_COLOR, color.getId());
+    }
+
+    @Nullable
+    public BlockPos getHome() {
+        return null;
+    }
+
+    public void setHome(@Nullable BlockPos pos) {
     }
 
     @Override

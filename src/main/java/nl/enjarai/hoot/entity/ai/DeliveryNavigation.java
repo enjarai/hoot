@@ -5,10 +5,13 @@ import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.util.math.BlockPos;
 
+import java.util.Optional;
+
+@SuppressWarnings("OptionalUsedAsFieldOrParameterType")
 public class DeliveryNavigation {
     public static final Codec<DeliveryNavigation> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            BlockPos.CODEC.fieldOf("source").forGetter(DeliveryNavigation::getSource),
-            BlockPos.CODEC.fieldOf("destination").forGetter(DeliveryNavigation::getDestination),
+            BlockPos.CODEC.optionalFieldOf("source").forGetter(DeliveryNavigation::getSource),
+            BlockPos.CODEC.optionalFieldOf("destination").forGetter(DeliveryNavigation::getDestination),
             State.CODEC.fieldOf("state").forGetter(DeliveryNavigation::getState)
     ).apply(instance, DeliveryNavigation::new));
 
@@ -19,22 +22,22 @@ public class DeliveryNavigation {
     public DeliveryNavigation() {
     }
 
-    public DeliveryNavigation(BlockPos source, BlockPos destination, State state) {
-        this.source = source;
-        this.destination = destination;
+    public DeliveryNavigation(Optional<BlockPos> source, Optional<BlockPos> destination, State state) {
+        this.source = source.orElse(null);
+        this.destination = destination.orElse(null);
         this.state = state;
     }
 
-    public BlockPos getSource() {
-        return source;
+    public Optional<BlockPos> getSource() {
+        return Optional.ofNullable(source);
     }
 
     public void setSource(BlockPos source) {
         this.source = source;
     }
 
-    public BlockPos getDestination() {
-        return destination;
+    public Optional<BlockPos> getDestination() {
+        return Optional.ofNullable(destination);
     }
 
     public void setDestination(BlockPos destination) {
