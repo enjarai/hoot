@@ -2,6 +2,7 @@ package nl.enjarai.hoot.entity.ai;
 
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.ai.goal.Goal;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.BlockView;
 import nl.enjarai.hoot.entity.OwlEntity;
@@ -22,9 +23,10 @@ public class TravelToDestinationGoal extends Goal {
 
     @Override
     public boolean canStart() {
-        return entity.deliveryNavigation.getState() != DeliveryNavigation.State.IDLE &&
-                entity.deliveryNavigation.getDestination().isPresent() &&
-                entity.deliveryNavigation.getSource().isPresent();
+        DeliveryNavigation nav = entity.deliveryNavigation;
+        return nav.getState() != DeliveryNavigation.State.IDLE &&
+                (nav.getDestination().isPresent() || nav.getDestinationEntityUUID().isPresent()) &&
+                nav.getSource().isPresent();
     }
 
     @Override
@@ -34,9 +36,10 @@ public class TravelToDestinationGoal extends Goal {
 
     @Override
     public boolean shouldContinue() {
-        return entity.deliveryNavigation.getState() != DeliveryNavigation.State.IDLE &&
-                entity.deliveryNavigation.getDestination().isPresent() &&
-                entity.deliveryNavigation.getSource().isPresent();
+        DeliveryNavigation nav = entity.deliveryNavigation;
+        return nav.getState() != DeliveryNavigation.State.IDLE &&
+                (nav.getDestination().isPresent() || nav.getDestinationEntityUUID().isPresent()) &&
+                nav.getSource().isPresent();
     }
 
     @Override
@@ -48,17 +51,13 @@ public class TravelToDestinationGoal extends Goal {
     public void tick() {
         var nav = entity.deliveryNavigation;
 
+        tryUpdateDestination();
         if (nav.getDestination().isEmpty() || nav.getSource().isEmpty()) return;
 
         var destination = nav.getDestination().get();
         var source = nav.getSource().get();
 
-        entity.getNavigation().startMovingTo(
-                destination.getX(),
-                destination.getY(),
-                destination.getZ(),
-                speed
-        );
+        entity.getNavigation().startMovingTo(destination.getX(), destination.getY(), destination.getZ(), speed);
 
         if (entity.squaredDistanceTo(destination.toCenterPos()) < 2 * 2) {
             onDestinationReached();
@@ -74,7 +73,10 @@ public class TravelToDestinationGoal extends Goal {
             var checkRange = (int) teleportDistance;
             for (var checkPos : BlockPos.iterateOutwards(travelPos, checkRange, checkRange, checkRange)) {
                 if (isSafe(entity.world, checkPos)) {
+                    entity.spawnTeleportParticles();
                     entity.teleport(checkPos.getX(), checkPos.getY(), checkPos.getZ());
+                    entity.spawnTeleportParticles();
+                    entity.getNavigation().recalculatePath();
                     return;
                 }
             }
@@ -91,10 +93,13 @@ public class TravelToDestinationGoal extends Goal {
 
             if (entity.getHome() != null) {
                 nav.setDestination(entity.getHome());
+                nav.setDestinationEntityUUID(null);
             } else if (entity.getOwner() != null) {
                 nav.setDestination(entity.getOwner().getBlockPos());
+                nav.setDestinationEntityUUID(entity.getOwner().getUuid());
             } else if (nav.getSource().isPresent()) {
                 nav.setDestination(nav.getSource().get());
+                nav.setDestinationEntityUUID(null);
             }
 
             nav.setSource(entity.getBlockPos());
@@ -102,10 +107,22 @@ public class TravelToDestinationGoal extends Goal {
         } else if (nav.getState() == DeliveryNavigation.State.RETURNING) {
             entity.onReturn();
             nav.setDestination(null);
+            nav.setDestinationEntityUUID(null);
             nav.setSource(null);
             nav.setState(DeliveryNavigation.State.IDLE);
         }
         entity.getNavigation().stop();
+    }
+
+    public void tryUpdateDestination() {
+        var nav = entity.deliveryNavigation;
+
+        if (nav.getDestinationEntityUUID().isPresent() && entity.getWorld() instanceof ServerWorld serverWorld) {
+            var destinationEntity = serverWorld.getEntity(nav.getDestinationEntityUUID().get());
+            if (destinationEntity != null) {
+                nav.setDestination(destinationEntity.getBlockPos());
+            }
+        }
     }
 
     public boolean isSafe(BlockView world, BlockPos pos) {

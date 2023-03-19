@@ -3,6 +3,8 @@ package nl.enjarai.hoot.entity;
 import com.mojang.datafixers.util.Pair;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.*;
+import net.minecraft.entity.ai.brain.MemoryModuleType;
+import net.minecraft.entity.ai.brain.task.LookTargetUtil;
 import net.minecraft.entity.ai.control.FlightMoveControl;
 import net.minecraft.entity.ai.goal.*;
 import net.minecraft.entity.ai.pathing.BirdNavigation;
@@ -20,14 +22,14 @@ import net.minecraft.entity.passive.PassiveEntity;
 import net.minecraft.entity.passive.RabbitEntity;
 import net.minecraft.entity.passive.TameableEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.DyeItem;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
+import net.minecraft.inventory.SimpleInventory;
+import net.minecraft.item.*;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.ActionResult;
@@ -35,6 +37,7 @@ import net.minecraft.util.DyeColor;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.GlobalPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.LocalDifficulty;
@@ -55,7 +58,7 @@ import java.util.Set;
 
 import static software.bernie.geckolib.constant.DefaultAnimations.*;
 
-public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolder<OwlVariant>, Flutterer {
+public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolder<OwlVariant>, Flutterer, InventoryOwner {
     private static final TrackedData<OwlVariant> VARIANT =
             DataTracker.registerData(OwlEntity.class, ModRegistries.OWL_VARIANT_DATA);
     private static final TrackedData<Integer> COLLAR_COLOR =
@@ -69,6 +72,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     private float flapSpeed;
     private float flapping = 1.0f;
     private float nextFlap = 1.0f;
+    private final SimpleInventory inventory = new SimpleInventory(1);
 
     protected OwlEntity(EntityType<? extends OwlEntity> entityType, World world) {
         super(entityType, world);
@@ -84,7 +88,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         goalSelector.add(0, new SwimGoal(this));
         goalSelector.add(1, new LookAtEntityGoal(this, PlayerEntity.class, 8.0f));
         goalSelector.add(2, new SitGoal(this));
-        goalSelector.add(3, new TravelToDestinationGoal(this, 1.5, 24));
+        goalSelector.add(3, new TravelToDestinationGoal(this, 1.5, 8)); // 24
         goalSelector.add(4, new FollowOwnerGoal(this, 1.0, 5.0f, 1.0f, true));
         goalSelector.add(4, new ParrotEntity.FlyOntoTreeGoal(this, 1.0));
         goalSelector.add(5, new FollowMobGoal(this, 1.0, 3.0f, 7.0f));
@@ -131,11 +135,23 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     }
 
     public void onDeliver() {
-
+        playHappySound();
+        dropHeldItem();
     }
 
     public void onReturn() {
+    }
 
+    public void spawnTeleportParticles() {
+        if (world instanceof ServerWorld serverWorld) {
+            serverWorld.spawnParticles(
+                    ParticleTypes.POOF,
+                    getX(), getY(), getZ(),
+                    10,
+                    0.5, 0.5, 0.5,
+                    0.0
+            );
+        }
     }
 
     @Override
@@ -144,16 +160,8 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         Item item = itemStack.getItem();
         if (!isTamed()) {
             if (TAMING_INGREDIENTS.contains(item)) {
-                if (!player.getAbilities().creativeMode) {
-                    itemStack.decrement(1);
-                }
-                if (!isSilent()) {
-                    world.playSound(
-                            null, getX(), getY(), getZ(),
-                            ModSoundEvents.ENTITY_OWL_EAT, getSoundCategory(), 1.0f,
-                            1.0f + (random.nextFloat() - random.nextFloat()) * 0.2f
-                    );
-                }
+                decrementStackUnlessInCreative(player, itemStack);
+                playHappySound();
                 if (!world.isClient) {
                     if (random.nextInt(5) == 0) {
                         setOwner(player);
@@ -169,12 +177,23 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                 DyeColor dyeColor = dye.getColor();
                 if (dyeColor == getCollarColor()) return super.interactMob(player, hand);
                 setCollarColor(dyeColor);
-                if (!player.getAbilities().creativeMode) {
-                    itemStack.decrement(1);
+                decrementStackUnlessInCreative(player, itemStack);
+                return ActionResult.SUCCESS;
+            }
+            if (item == Items.COMPASS && isOwner(player) &&
+                    !getEquippedStack(EquipmentSlot.MAINHAND).isEmpty() && CompassItem.hasLodestone(itemStack)) {
+                GlobalPos lodestonePos = CompassItem.createLodestonePos(itemStack.getOrCreateNbt());
+                if (lodestonePos != null &&
+                        lodestonePos.getDimension().equals(world.getRegistryKey()) &&
+                        tryStartDelivery(lodestonePos.getPos().up())) {
+                    playHappySound();
                 }
                 return ActionResult.SUCCESS;
             }
-            if (!isInAir() && isTamed() && isOwner(player)) {
+            if (replaceHeldItem(player, hand)) {
+                return ActionResult.SUCCESS;
+            }
+            if (!isInAir() && isOwner(player)) {
                 if (!world.isClient) {
                     setSitting(!isSitting());
                 }
@@ -182,6 +201,42 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
             }
         }
         return super.interactMob(player, hand);
+    }
+    
+    public boolean replaceHeldItem(PlayerEntity player, Hand hand) {
+        ItemStack playerHand = player.getStackInHand(hand);
+        ItemStack owlHand = getStackInHand(Hand.MAIN_HAND);
+        if (owlHand.isEmpty() && !playerHand.isEmpty()) {
+            ItemStack stack = playerHand.copy();
+            stack.setCount(1);
+            setStackInHand(Hand.MAIN_HAND, stack);
+            decrementStackUnlessInCreative(player, playerHand);
+            world.playSoundFromEntity(
+                    null, this,
+                    SoundEvents.ITEM_ARMOR_EQUIP_LEATHER, getSoundCategory(),
+                    2.0f, 1.0f
+            );
+            return true;
+        }
+        if (!owlHand.isEmpty() && hand == Hand.MAIN_HAND && playerHand.isEmpty()) {
+            equipStack(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+            world.playSoundFromEntity(
+                    null, this,
+                    SoundEvents.ITEM_ARMOR_EQUIP_LEATHER, getSoundCategory(),
+                    2.0f, 1.0f
+            );
+            player.giveItemStack(owlHand);
+            return true;
+        }
+        return false;
+    }
+
+    private void dropHeldItem() {
+        ItemStack stack = getStackInHand(Hand.MAIN_HAND);
+        if (!stack.isEmpty()) {
+            equipStack(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+            dropStack(stack);
+        }
     }
 
     @Nullable
@@ -220,6 +275,35 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     public void setHome(@Nullable BlockPos pos) {
     }
 
+    public boolean tryStartDelivery(BlockPos destination) {
+        if (!isDelivering()) {
+            deliveryNavigation.setSource(getBlockPos());
+            deliveryNavigation.setDestination(destination);
+            deliveryNavigation.setState(DeliveryNavigation.State.DELIVERING);
+            setSitting(false);
+
+            return true;
+        }
+        return false;
+    }
+
+    public boolean tryStartDelivery(Entity target) {
+        if (!isDelivering()) {
+            deliveryNavigation.setSource(getBlockPos());
+            deliveryNavigation.setDestinationEntityUUID(target.getUuid());
+            deliveryNavigation.setDestination(target.getBlockPos());
+            deliveryNavigation.setState(DeliveryNavigation.State.DELIVERING);
+            setSitting(false);
+
+            return true;
+        }
+        return false;
+    }
+
+    public boolean isDelivering() {
+        return deliveryNavigation.getState() != DeliveryNavigation.State.IDLE;
+    }
+
     @Override
     public boolean handleFallDamage(float fallDistance, float damageMultiplier, DamageSource damageSource) {
         return false;
@@ -250,6 +334,16 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     @Override
     protected SoundEvent getDeathSound() {
         return ModSoundEvents.ENTITY_OWL_DEATH;
+    }
+
+    private void playHappySound() {
+        if (!isSilent()) {
+            world.playSoundFromEntity(
+                    null, this,
+                    ModSoundEvents.ENTITY_OWL_EAT, getSoundCategory(), 1.0f,
+                    1.0f + (random.nextFloat() - random.nextFloat()) * 0.2f
+            );
+        }
     }
 
     private void flapWings() {
@@ -287,6 +381,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     @Override
     public void writeCustomDataToNbt(NbtCompound nbt) {
         super.writeCustomDataToNbt(nbt);
+        writeInventory(nbt);
         nbt.putString("variant", ModRegistries.OWL_VARIANT.getId(getVariant()).toString());
         nbt.putByte("CollarColor", (byte) getCollarColor().getId());
         nbt.put("navigation", DeliveryNavigation.CODEC
@@ -297,6 +392,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     @Override
     public void readCustomDataFromNbt(NbtCompound nbt) {
         super.readCustomDataFromNbt(nbt);
+        readInventory(nbt);
         OwlVariant variant = ModRegistries.OWL_VARIANT.get(Identifier.tryParse(nbt.getString("variant")));
         if (variant != null) {
             setVariant(variant);
@@ -332,5 +428,16 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     @Override
     public boolean isInAir() {
         return !isOnGround();
+    }
+
+    @Override
+    public SimpleInventory getInventory() {
+        return inventory;
+    }
+
+    private void decrementStackUnlessInCreative(PlayerEntity player, ItemStack stack) {
+        if (!player.getAbilities().creativeMode) {
+            stack.decrement(1);
+        }
     }
 }

@@ -45,6 +45,11 @@
 					]
 				},
 				{
+					"name": "held_item",
+					"parent": "head",
+					"pivot": [0, 10, -4]
+				},
+				{
 					"name": "wing_left",
 					"parent": "main",
 					"pivot": [3, 10, -1],
