@@ -44,6 +44,7 @@ import net.minecraft.world.LocalDifficulty;
 import net.minecraft.world.ServerWorldAccess;
 import net.minecraft.world.World;
 import nl.enjarai.hoot.entity.ai.DeliveryNavigation;
+import nl.enjarai.hoot.entity.ai.ThrowAroundItemGoal;
 import nl.enjarai.hoot.entity.ai.TravelToDestinationGoal;
 import nl.enjarai.hoot.registry.ModRegistries;
 import nl.enjarai.hoot.registry.ModSoundEvents;
@@ -91,6 +92,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         goalSelector.add(3, new TravelToDestinationGoal(this, 1.5, 8)); // 24
         goalSelector.add(4, new FollowOwnerGoal(this, 1.0, 5.0f, 1.0f, true));
         goalSelector.add(4, new ParrotEntity.FlyOntoTreeGoal(this, 1.0));
+        goalSelector.add(5, new ThrowAroundItemGoal(this));
         goalSelector.add(5, new FollowMobGoal(this, 1.0, 3.0f, 7.0f));
         goalSelector.add(9, new AttackGoal(this));
         targetSelector.add(1, new UntamedActiveTargetGoal<>(this, RabbitEntity.class, false, null));
@@ -231,13 +233,36 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         return false;
     }
 
-    private void dropHeldItem() {
+    public void dropHeldItem() {
         ItemStack stack = getStackInHand(Hand.MAIN_HAND);
         if (!stack.isEmpty()) {
             equipStack(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
             dropStack(stack);
         }
     }
+
+    /* start code that idk if it'll work */
+    @Override
+    public boolean canEquip(ItemStack stack) {
+        EquipmentSlot equipmentSlot = MobEntity.getPreferredEquipmentSlot(stack);
+        if (!getEquippedStack(equipmentSlot).isEmpty()) {
+            return false;
+        }
+        return equipmentSlot == EquipmentSlot.MAINHAND && super.canEquip(stack);
+    }
+
+    @Override
+    protected void loot(ItemEntity item) {
+        ItemStack itemStack;
+        if (getEquippedStack(EquipmentSlot.MAINHAND).isEmpty() && canPickupItem(itemStack = item.getStack())) {
+            triggerItemPickedUpByEntityCriteria(item);
+            equipStack(EquipmentSlot.MAINHAND, itemStack);
+            updateDropChances(EquipmentSlot.MAINHAND);
+            sendPickup(item, itemStack.getCount());
+            item.discard();
+        }
+    }
+    /* end code that idk if it'll work */
 
     @Nullable
     @Override
@@ -318,6 +343,11 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         return target.damage(DamageSource.mob(this), (float) getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE));
     }
 
+    @Override
+    protected Vec3d getLeashOffset() {
+        return super.getLeashOffset().add(0, -0.3, -0.1);
+    }
+
     @Nullable
     @Override
     protected SoundEvent getAmbientSound() {
@@ -336,7 +366,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         return ModSoundEvents.ENTITY_OWL_DEATH;
     }
 
-    private void playHappySound() {
+    public void playHappySound() {
         if (!isSilent()) {
             world.playSoundFromEntity(
                     null, this,
