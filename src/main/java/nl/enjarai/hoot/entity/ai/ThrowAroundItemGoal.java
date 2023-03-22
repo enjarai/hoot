@@ -41,7 +41,6 @@ public class ThrowAroundItemGoal extends Goal {
         if (!itemsNear.isEmpty()) {
             entity.getNavigation().startMovingTo(itemsNear.get(0), 1.2f);
             entity.getLookControl().lookAt(itemsNear.get(0));
-            entity.playHappySound();
         }
         nextThrow = 0;
     }
@@ -67,6 +66,6 @@ public class ThrowAroundItemGoal extends Goal {
     @Override
     public void stop() {
         entity.dropHeldItem();
-        nextThrow = entity.age + entity.getRandom().nextInt(100);
+        nextThrow = entity.age + entity.getRandom().nextInt(1200);
     }
 }

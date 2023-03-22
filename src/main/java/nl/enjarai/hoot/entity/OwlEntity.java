@@ -2,6 +2,7 @@ package nl.enjarai.hoot.entity;
 
 import com.mojang.datafixers.util.Pair;
 import net.minecraft.block.BlockState;
+import net.minecraft.client.util.ParticleUtil;
 import net.minecraft.entity.*;
 import net.minecraft.entity.ai.brain.MemoryModuleType;
 import net.minecraft.entity.ai.brain.task.LookTargetUtil;
@@ -192,6 +193,12 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                 }
                 return ActionResult.SUCCESS;
             }
+            if (player.isSneaking() && isOwner(player) && isDelivering()) {
+                playHurtSound(DamageSource.GENERIC);
+                showEmoteParticle(false);
+                completeDelivery(false);
+                return ActionResult.SUCCESS;
+            }
             if (replaceHeldItem(player, hand)) {
                 return ActionResult.SUCCESS;
             }
@@ -208,7 +215,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     public boolean replaceHeldItem(PlayerEntity player, Hand hand) {
         ItemStack playerHand = player.getStackInHand(hand);
         ItemStack owlHand = getStackInHand(Hand.MAIN_HAND);
-        if (owlHand.isEmpty() && !playerHand.isEmpty()) {
+        if (owlHand.isEmpty() && playerHand.isOf(Items.BUNDLE)) {
             ItemStack stack = playerHand.copy();
             stack.setCount(1);
             setStackInHand(Hand.MAIN_HAND, stack);
@@ -327,6 +334,32 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
 
     public boolean isDelivering() {
         return deliveryNavigation.getState() != DeliveryNavigation.State.IDLE;
+    }
+
+    public void completeDelivery(boolean success) {
+        if (deliveryNavigation.getState() == DeliveryNavigation.State.DELIVERING) {
+            if (success) onDeliver();
+
+            if (getHome() != null) {
+                deliveryNavigation.setDestination(getHome());
+                deliveryNavigation.setDestinationEntityUUID(null);
+            } else if (getOwner() != null) {
+                deliveryNavigation.setDestination(getOwner().getBlockPos());
+                deliveryNavigation.setDestinationEntityUUID(getOwner().getUuid());
+            } else if (deliveryNavigation.getSource().isPresent()) {
+                deliveryNavigation.setDestination(deliveryNavigation.getSource().get());
+                deliveryNavigation.setDestinationEntityUUID(null);
+            }
+
+            deliveryNavigation.setSource(getBlockPos());
+            deliveryNavigation.setState(DeliveryNavigation.State.RETURNING);
+        } else if (deliveryNavigation.getState() == DeliveryNavigation.State.RETURNING) {
+            if (success) onReturn();
+            deliveryNavigation.setDestination(null);
+            deliveryNavigation.setDestinationEntityUUID(null);
+            deliveryNavigation.setSource(null);
+            deliveryNavigation.setState(DeliveryNavigation.State.IDLE);
+        }
     }
 
     @Override

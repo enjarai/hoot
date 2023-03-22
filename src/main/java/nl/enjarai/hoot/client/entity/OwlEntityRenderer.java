@@ -19,6 +19,7 @@ import software.bernie.geckolib.renderer.layer.BlockAndItemGeoLayer;
 
 public class OwlEntityRenderer extends GeoEntityRenderer<OwlEntity> {
     public static final Identifier COLLAR_TEXTURE = new Identifier("hoot", "textures/entity/owl/collar.png");
+    public static final Identifier HOME_COLLAR_TEXTURE = new Identifier("hoot", "textures/entity/owl/home_collar.png");
 
     public OwlEntityRenderer(EntityRendererFactory.Context renderManager) {
         super(renderManager, new OwlEntityModel());
@@ -28,12 +29,27 @@ public class OwlEntityRenderer extends GeoEntityRenderer<OwlEntity> {
                 return COLLAR_TEXTURE;
             }
 
-            @Nullable
             @Override
-            protected DyeColor getColor(OwlEntity animatable) {
-                return animatable.isTamed() ? animatable.getCollarColor() : null;
+            protected float[] getColor(OwlEntity animatable) {
+                return animatable.getCollarColor().getColorComponents();
+            }
+
+            @Override
+            protected boolean shouldRender(OwlEntity animatable) {
+                return animatable.isTamed();
             }
         });
+//        addRenderLayer(new CollarGeoLayer<>(this) {
+//            @Override
+//            protected Identifier getTextureResource(OwlEntity animatable) {
+//                return HOME_COLLAR_TEXTURE;
+//            }
+//
+//            @Override
+//            protected boolean shouldRender(OwlEntity animatable) {
+//                return animatable.isTamed() && animatable.getHome() != null;
+//            }
+//        });
         addRenderLayer(new BlockAndItemGeoLayer<>(this) {
             @Override
             protected ItemStack getStackForBone(GeoBone bone, OwlEntity animatable) {

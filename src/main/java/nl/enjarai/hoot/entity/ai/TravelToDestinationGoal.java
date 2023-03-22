@@ -88,29 +88,7 @@ public class TravelToDestinationGoal extends Goal {
     private void onDestinationReached() {
         var nav = entity.deliveryNavigation;
 
-        if (nav.getState() == DeliveryNavigation.State.DELIVERING) {
-            entity.onDeliver();
-
-            if (entity.getHome() != null) {
-                nav.setDestination(entity.getHome());
-                nav.setDestinationEntityUUID(null);
-            } else if (entity.getOwner() != null) {
-                nav.setDestination(entity.getOwner().getBlockPos());
-                nav.setDestinationEntityUUID(entity.getOwner().getUuid());
-            } else if (nav.getSource().isPresent()) {
-                nav.setDestination(nav.getSource().get());
-                nav.setDestinationEntityUUID(null);
-            }
-
-            nav.setSource(entity.getBlockPos());
-            nav.setState(DeliveryNavigation.State.RETURNING);
-        } else if (nav.getState() == DeliveryNavigation.State.RETURNING) {
-            entity.onReturn();
-            nav.setDestination(null);
-            nav.setDestinationEntityUUID(null);
-            nav.setSource(null);
-            nav.setState(DeliveryNavigation.State.IDLE);
-        }
+        entity.completeDelivery(true);
         entity.getNavigation().stop();
     }
 
