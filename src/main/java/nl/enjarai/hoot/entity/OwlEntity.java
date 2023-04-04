@@ -17,6 +17,7 @@ import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
+import net.minecraft.entity.decoration.LeashKnotEntity;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.passive.ParrotEntity;
 import net.minecraft.entity.passive.PassiveEntity;
@@ -47,6 +48,7 @@ import net.minecraft.world.World;
 import nl.enjarai.hoot.entity.ai.DeliveryNavigation;
 import nl.enjarai.hoot.entity.ai.ThrowAroundItemGoal;
 import nl.enjarai.hoot.entity.ai.TravelToDestinationGoal;
+import nl.enjarai.hoot.entity.ai.WanderNearHomeGoal;
 import nl.enjarai.hoot.registry.ModRegistries;
 import nl.enjarai.hoot.registry.ModSoundEvents;
 import org.jetbrains.annotations.Nullable;
@@ -67,10 +69,12 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
             DataTracker.registerData(OwlEntity.class, TrackedDataHandlerRegistry.INTEGER);
 
     private static final Set<Item> TAMING_INGREDIENTS = Set.of(Items.RABBIT);
-
+    private static final int LEASH_TIME_BEFORE_HOME = 20 * 60 * 20; // 20 minutes, 24000 ticks, one minecraft day
 
     private final AnimatableInstanceCache animationCache = GeckoLibUtil.createInstanceCache(this);
     public DeliveryNavigation deliveryNavigation;
+    private int leashedTime;
+    private GlobalPos homePos;
     private float flapSpeed;
     private float flapping = 1.0f;
     private float nextFlap = 1.0f;
@@ -90,8 +94,9 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         goalSelector.add(0, new SwimGoal(this));
         goalSelector.add(1, new LookAtEntityGoal(this, PlayerEntity.class, 8.0f));
         goalSelector.add(2, new SitGoal(this));
-        goalSelector.add(3, new TravelToDestinationGoal(this, 1.5, 8)); // 24
-        goalSelector.add(4, new FollowOwnerGoal(this, 1.0, 5.0f, 1.0f, true));
+        goalSelector.add(3, new TravelToDestinationGoal(this, 1.5, 24));
+        goalSelector.add(4, new WanderNearHomeGoal(this, 1.0, 14));
+//        goalSelector.add(4, new FollowOwnerGoal(this, 1.0, 5.0f, 1.0f, true));
         goalSelector.add(4, new ParrotEntity.FlyOntoTreeGoal(this, 1.0));
         goalSelector.add(5, new ThrowAroundItemGoal(this));
         goalSelector.add(5, new FollowMobGoal(this, 1.0, 3.0f, 7.0f));
@@ -215,7 +220,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     public boolean replaceHeldItem(PlayerEntity player, Hand hand) {
         ItemStack playerHand = player.getStackInHand(hand);
         ItemStack owlHand = getStackInHand(Hand.MAIN_HAND);
-        if (owlHand.isEmpty() && playerHand.isOf(Items.BUNDLE)) {
+        if (owlHand.isEmpty() && !playerHand.isEmpty() && hand == Hand.MAIN_HAND) {
             ItemStack stack = playerHand.copy();
             stack.setCount(1);
             setStackInHand(Hand.MAIN_HAND, stack);
@@ -248,7 +253,24 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         }
     }
 
-    /* start code that idk if it'll work */
+    @Override
+    public void updateLeash() {
+        super.updateLeash();
+        if (isTamed()) {
+            if (isLeashed() && getHoldingEntity() instanceof LeashKnotEntity knot && getHome() == null) {
+                leashedTime += 1;
+                if (leashedTime > LEASH_TIME_BEFORE_HOME) {
+                    setHome(GlobalPos.create(world.getRegistryKey(), knot.getBlockPos()));
+                    playHappySound();
+                    world.sendEntityStatus(this, EntityStatuses.ADD_POSITIVE_PLAYER_REACTION_PARTICLES);
+                }
+            } else {
+                leashedTime = 0;
+            }
+        }
+    }
+
+    /* start code that idk if it'll do anything */
     @Override
     public boolean canEquip(ItemStack stack) {
         EquipmentSlot equipmentSlot = MobEntity.getPreferredEquipmentSlot(stack);
@@ -269,7 +291,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
             item.discard();
         }
     }
-    /* end code that idk if it'll work */
+    /* end code that idk if it'll do anything */
 
     @Nullable
     @Override
@@ -300,11 +322,12 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     }
 
     @Nullable
-    public BlockPos getHome() {
-        return null;
+    public GlobalPos getHome() {
+        return homePos;
     }
 
-    public void setHome(@Nullable BlockPos pos) {
+    public void setHome(@Nullable GlobalPos pos) {
+        homePos = pos;
     }
 
     public boolean tryStartDelivery(BlockPos destination) {
@@ -340,10 +363,10 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         if (deliveryNavigation.getState() == DeliveryNavigation.State.DELIVERING) {
             if (success) onDeliver();
 
-            if (getHome() != null) {
-                deliveryNavigation.setDestination(getHome());
+            if (getHome() != null && getHome().getDimension().equals(world.getRegistryKey())) {
+                deliveryNavigation.setDestination(getHome().getPos());
                 deliveryNavigation.setDestinationEntityUUID(null);
-            } else if (getOwner() != null) {
+            } else if (getOwner() != null && getOwner().world.getRegistryKey().equals(world.getRegistryKey())) {
                 deliveryNavigation.setDestination(getOwner().getBlockPos());
                 deliveryNavigation.setDestinationEntityUUID(getOwner().getUuid());
             } else if (deliveryNavigation.getSource().isPresent()) {
@@ -450,6 +473,12 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         nbt.put("navigation", DeliveryNavigation.CODEC
                 .encodeStart(NbtOps.INSTANCE, deliveryNavigation)
                 .result().orElse(new NbtCompound()));
+        nbt.putInt("leashedTime", leashedTime);
+        if (homePos != null) {
+            nbt.put("homePos", GlobalPos.CODEC
+                    .encodeStart(NbtOps.INSTANCE, homePos)
+                    .result().orElse(new NbtCompound()));
+        }
     }
 
     @Override
@@ -467,6 +496,14 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
             deliveryNavigation = DeliveryNavigation.CODEC
                     .decode(NbtOps.INSTANCE, nbt.getCompound("navigation"))
                     .result().map(Pair::getFirst).orElse(deliveryNavigation);
+        }
+        if (nbt.contains("leashedTime", NbtElement.NUMBER_TYPE)) {
+            leashedTime = nbt.getInt("leashedTime");
+        }
+        if (nbt.contains("homePos", NbtElement.COMPOUND_TYPE)) {
+            homePos = GlobalPos.CODEC
+                    .decode(NbtOps.INSTANCE, nbt.getCompound("homePos"))
+                    .result().map(Pair::getFirst).orElse(null);
         }
     }
 
