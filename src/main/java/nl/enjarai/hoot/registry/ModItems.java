@@ -8,7 +8,6 @@ import net.minecraft.item.SpawnEggItem;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import nl.enjarai.hoot.Hoot;
-import nl.enjarai.hoot.entity.ModEntities;
 
 public class ModItems {
     public static final Item OWL_SPAWN_EGG = new SpawnEggItem(

@@ -2,7 +2,7 @@ package nl.enjarai.hoot;
 
 import net.fabricmc.api.ModInitializer;
 import net.minecraft.util.Identifier;
-import nl.enjarai.hoot.entity.ModEntities;
+import nl.enjarai.hoot.registry.ModEntities;
 import nl.enjarai.hoot.registry.ModItems;
 import nl.enjarai.hoot.registry.ModRegistries;
 import nl.enjarai.hoot.registry.ModSoundEvents;

@@ -1,3 +1,4 @@
 accessWidener   v1  named
 
-accessible  class   net/minecraft/entity/passive/ParrotEntity$FlyOntoTreeGoal
+accessible class net/minecraft/entity/passive/ParrotEntity$FlyOntoTreeGoal
+accessible class net/minecraft/entity/passive/RabbitEntity$FleeGoal

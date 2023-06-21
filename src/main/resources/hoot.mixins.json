@@ -3,6 +3,7 @@
 	"package": "nl.enjarai.hoot.mixin",
 	"compatibilityLevel": "JAVA_17",
 	"mixins": [
+		"RabbitEntityMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

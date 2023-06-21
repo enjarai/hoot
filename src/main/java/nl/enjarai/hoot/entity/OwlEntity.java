@@ -2,10 +2,8 @@ package nl.enjarai.hoot.entity;
 
 import com.mojang.datafixers.util.Pair;
 import net.minecraft.block.BlockState;
-import net.minecraft.client.util.ParticleUtil;
+import net.minecraft.block.Blocks;
 import net.minecraft.entity.*;
-import net.minecraft.entity.ai.brain.MemoryModuleType;
-import net.minecraft.entity.ai.brain.task.LookTargetUtil;
 import net.minecraft.entity.ai.control.FlightMoveControl;
 import net.minecraft.entity.ai.goal.*;
 import net.minecraft.entity.ai.pathing.BirdNavigation;
@@ -30,8 +28,8 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.particle.ParticleTypes;
+import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.ActionResult;
@@ -42,6 +40,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.GlobalPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.random.Random;
 import net.minecraft.world.LocalDifficulty;
 import net.minecraft.world.ServerWorldAccess;
 import net.minecraft.world.World;
@@ -56,6 +55,7 @@ import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.core.animation.AnimatableManager;
 import software.bernie.geckolib.core.animation.AnimationController;
+import software.bernie.geckolib.core.animation.RawAnimation;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
 import java.util.Set;
@@ -71,6 +71,8 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     private static final Set<Item> TAMING_INGREDIENTS = Set.of(Items.RABBIT);
     private static final int LEASH_TIME_BEFORE_HOME = 20 * 60 * 20; // 20 minutes, 24000 ticks, one minecraft day
 
+    public static final RawAnimation DANCE_ANIMATION = RawAnimation.begin().thenLoop("misc.dance");
+
     private final AnimatableInstanceCache animationCache = GeckoLibUtil.createInstanceCache(this);
     public DeliveryNavigation deliveryNavigation;
     private int leashedTime;
@@ -79,8 +81,11 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     private float flapping = 1.0f;
     private float nextFlap = 1.0f;
     private final SimpleInventory inventory = new SimpleInventory(1);
+    private boolean songPlaying;
+    @Nullable
+    private BlockPos songSource;
 
-    protected OwlEntity(EntityType<? extends OwlEntity> entityType, World world) {
+    public OwlEntity(EntityType<? extends OwlEntity> entityType, World world) {
         super(entityType, world);
         moveControl = new FlightMoveControl(this, 10, false);
         deliveryNavigation = new DeliveryNavigation();
@@ -94,13 +99,13 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         goalSelector.add(0, new SwimGoal(this));
         goalSelector.add(1, new LookAtEntityGoal(this, PlayerEntity.class, 8.0f));
         goalSelector.add(2, new SitGoal(this));
-        goalSelector.add(3, new TravelToDestinationGoal(this, 1.5, 24));
-        goalSelector.add(4, new WanderNearHomeGoal(this, 1.0, 14));
-//        goalSelector.add(4, new FollowOwnerGoal(this, 1.0, 5.0f, 1.0f, true));
-        goalSelector.add(4, new ParrotEntity.FlyOntoTreeGoal(this, 1.0));
+        goalSelector.add(3, new TravelToDestinationGoal(this, 1.5, 8));
+        goalSelector.add(4, new MeleeAttackGoal(this, 1.0, false));
         goalSelector.add(5, new ThrowAroundItemGoal(this));
-        goalSelector.add(5, new FollowMobGoal(this, 1.0, 3.0f, 7.0f));
-        goalSelector.add(9, new AttackGoal(this));
+        goalSelector.add(6, new WanderNearHomeGoal(this, 1.0, 14));
+//        goalSelector.add(4, new FollowOwnerGoal(this, 1.0, 5.0f, 1.0f, true));
+        goalSelector.add(6, new ParrotEntity.FlyOntoTreeGoal(this, 1.0));
+        goalSelector.add(6, new FollowMobGoal(this, 1.0, 3.0f, 7.0f));
         targetSelector.add(1, new UntamedActiveTargetGoal<>(this, RabbitEntity.class, false, null));
     }
 
@@ -133,6 +138,11 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
 
     @Override
     public void tickMovement() {
+        if (this.songSource == null || !this.songSource.isWithinDistance(this.getPos(), 3.46) || !this.world.getBlockState(this.songSource).isOf(Blocks.JUKEBOX)) {
+            this.songPlaying = false;
+            this.songSource = null;
+        }
+
         super.tickMovement();
 
         if (!world.isClient && isAlive() && age % 10 == 0) {
@@ -140,6 +150,16 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         }
 
         flapWings();
+    }
+
+    @Override
+    public void setNearbySongPlaying(BlockPos songPosition, boolean playing) {
+        this.songSource = songPosition;
+        this.songPlaying = playing;
+    }
+
+    public boolean isSongPlaying() {
+        return this.songPlaying;
     }
 
     public void onDeliver() {
@@ -512,10 +532,10 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         controllerRegistrar.add(
                 new AnimationController<>(this, "fly/idle", 1, state -> {
                     if (isInSittingPose()) {
-                        return state.setAndContinue(SIT);
+                        return state.setAndContinue(isSongPlaying() ? DANCE_ANIMATION : SIT);
                     }
 
-                    return state.setAndContinue(state.isMoving() || !isOnGround() ? FLY : IDLE);
+                    return state.setAndContinue(state.isMoving() || !isOnGround() ? FLY : (isSongPlaying() ? DANCE_ANIMATION : IDLE));
                 })
         );
     }
@@ -539,5 +559,9 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         if (!player.getAbilities().creativeMode) {
             stack.decrement(1);
         }
+    }
+
+    public static boolean canSpawn(EntityType<OwlEntity> entityType, ServerWorldAccess world, SpawnReason spawnReason, BlockPos pos, Random random) {
+        return world.getBlockState(pos.down()).isIn(BlockTags.PARROTS_SPAWNABLE_ON) && isLightLevelValidForNaturalSpawn(world, pos);
     }
 }

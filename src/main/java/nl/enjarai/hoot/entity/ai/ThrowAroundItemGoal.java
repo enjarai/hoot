@@ -3,7 +3,6 @@ package nl.enjarai.hoot.entity.ai;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.ai.goal.Goal;
-import net.minecraft.item.ItemStack;
 import nl.enjarai.hoot.entity.OwlEntity;
 
 import java.util.EnumSet;
@@ -15,6 +14,7 @@ public class ThrowAroundItemGoal extends Goal {
 
     private final OwlEntity entity;
     private int nextThrow;
+    private int targetItem;
 
     public ThrowAroundItemGoal(OwlEntity entity) {
         this.entity = entity;
@@ -41,31 +41,34 @@ public class ThrowAroundItemGoal extends Goal {
         if (!itemsNear.isEmpty()) {
             entity.getNavigation().startMovingTo(itemsNear.get(0), 1.2f);
             entity.getLookControl().lookAt(itemsNear.get(0));
+            targetItem = itemsNear.get(0).getId();
         }
         nextThrow = 0;
     }
 
     @Override
     public boolean shouldContinue() {
-        List<ItemEntity> itemsNear = getItemsNear();
-        return !itemsNear.isEmpty() && entity.getEquippedStack(EquipmentSlot.MAINHAND).isEmpty();
+        var item = entity.getWorld().getEntityById(targetItem);
+        return item != null && nextThrow < entity.age && item.squaredDistanceTo(entity) < 16 * 16;
     }
 
     @Override
     public void tick() {
-        List<ItemEntity> itemsNear = getItemsNear();
-        ItemStack itemStack = entity.getEquippedStack(EquipmentSlot.MAINHAND);
-        if (!itemStack.isEmpty()) {
-            entity.dropHeldItem();
-        } else if (!itemsNear.isEmpty()) {
-            entity.getNavigation().startMovingTo(itemsNear.get(0), 1.2f);
-            entity.getLookControl().lookAt(itemsNear.get(0));
+        var item = entity.getWorld().getEntityById(targetItem);
+        if (item != null) {
+            entity.getNavigation().startMovingTo(item, 1.2f);
+            entity.getLookControl().lookAt(item);
+
+            if (item.squaredDistanceTo(entity) < 1) {
+                item.setVelocity(entity.getRandom().nextDouble() * 0.1, 0.2, entity.getRandom().nextDouble() * 0.1);
+
+                nextThrow = entity.age + entity.getRandom().nextInt(1200);
+            }
         }
     }
 
     @Override
     public void stop() {
-        entity.dropHeldItem();
         nextThrow = entity.age + entity.getRandom().nextInt(1200);
     }
 }
