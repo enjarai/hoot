@@ -81,4 +81,15 @@ public class OwlEntityRenderer extends GeoEntityRenderer<OwlEntity> {
 
         bufferSource.getBuffer(RenderLayer.getEntityCutoutNoCull(getTextureLocation(getAnimatable())));
     }
+
+    @Override
+    public void render(OwlEntity entity, float entityYaw, float partialTick, MatrixStack poseStack, VertexConsumerProvider bufferSource, int packedLight) {
+        poseStack.push();
+        if (entity.isBaby()) {
+            poseStack.scale(0.5f, 0.5f, 0.5f);
+        }
+
+        super.render(entity, entityYaw, partialTick, poseStack, bufferSource, packedLight);
+        poseStack.pop();
+    }
 }

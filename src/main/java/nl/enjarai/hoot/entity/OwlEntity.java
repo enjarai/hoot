@@ -17,10 +17,7 @@ import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.decoration.LeashKnotEntity;
 import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.passive.ParrotEntity;
-import net.minecraft.entity.passive.PassiveEntity;
-import net.minecraft.entity.passive.RabbitEntity;
-import net.minecraft.entity.passive.TameableEntity;
+import net.minecraft.entity.passive.*;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.*;
@@ -48,6 +45,8 @@ import nl.enjarai.hoot.entity.ai.DeliveryNavigation;
 import nl.enjarai.hoot.entity.ai.ThrowAroundItemGoal;
 import nl.enjarai.hoot.entity.ai.TravelToDestinationGoal;
 import nl.enjarai.hoot.entity.ai.WanderNearHomeGoal;
+import nl.enjarai.hoot.registry.ModEntities;
+import nl.enjarai.hoot.registry.ModItems;
 import nl.enjarai.hoot.registry.ModRegistries;
 import nl.enjarai.hoot.registry.ModSoundEvents;
 import org.jetbrains.annotations.Nullable;
@@ -62,11 +61,14 @@ import java.util.Set;
 
 import static software.bernie.geckolib.constant.DefaultAnimations.*;
 
-public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolder<OwlVariant>, Flutterer, InventoryOwner {
+public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolder<OwlVariant>, Flutterer, InventoryOwner, Bucketable {
     private static final TrackedData<OwlVariant> VARIANT =
             DataTracker.registerData(OwlEntity.class, ModRegistries.OWL_VARIANT_DATA);
     private static final TrackedData<Integer> COLLAR_COLOR =
             DataTracker.registerData(OwlEntity.class, TrackedDataHandlerRegistry.INTEGER);
+    private static final TrackedData<Boolean> FROM_BUCKET =
+            DataTracker.registerData(OwlEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
+
 
     private static final Set<Item> TAMING_INGREDIENTS = Set.of(Items.RABBIT);
     private static final int LEASH_TIME_BEFORE_HOME = 20 * 60 * 20; // 20 minutes, 24000 ticks, one minecraft day
@@ -90,7 +92,6 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         moveControl = new FlightMoveControl(this, 10, false);
         deliveryNavigation = new DeliveryNavigation();
         setPathfindingPenalty(PathNodeType.DANGER_FIRE, -1.0f);
-        setPathfindingPenalty(PathNodeType.DAMAGE_FIRE, -1.0f);
     }
 
     @Override
@@ -105,8 +106,10 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         goalSelector.add(6, new WanderNearHomeGoal(this, 1.0, 14));
 //        goalSelector.add(4, new FollowOwnerGoal(this, 1.0, 5.0f, 1.0f, true));
         goalSelector.add(6, new ParrotEntity.FlyOntoTreeGoal(this, 1.0));
-        goalSelector.add(6, new FollowMobGoal(this, 1.0, 3.0f, 7.0f));
-        targetSelector.add(1, new UntamedActiveTargetGoal<>(this, RabbitEntity.class, false, null));
+//        goalSelector.add(6, new FollowMobGoal(this, 1.0, 3.0f, 7.0f));
+        targetSelector.add(1, new TrackOwnerAttackerGoal(this));
+        targetSelector.add(2, new AttackWithOwnerGoal(this));
+        targetSelector.add(3, new UntamedActiveTargetGoal<>(this, RabbitEntity.class, false, null));
     }
 
     @Override
@@ -201,6 +204,9 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                 return ActionResult.success(world.isClient);
             }
         } else {
+            var bucketResult = Bucketable.tryBucket(player, hand, this);
+            if (bucketResult.isPresent()) return bucketResult.get();
+
             if (item instanceof DyeItem dye) {
                 DyeColor dyeColor = dye.getColor();
                 if (dyeColor == getCollarColor()) return super.interactMob(player, hand);
@@ -313,10 +319,19 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     }
     /* end code that idk if it'll do anything */
 
+    @Override
+    public boolean isBreedingItem(ItemStack stack) {
+        return stack.isOf(Items.RABBIT);
+    }
+
     @Nullable
     @Override
     public PassiveEntity createChild(ServerWorld world, PassiveEntity entity) {
-        return null;
+        var owl = ModEntities.OWL.create(world);
+        if (owl == null) return null;
+
+        owl.setVariant(random.nextBoolean() ? getVariant() : ((OwlEntity) entity).getVariant());
+        return owl;
     }
 
     public Identifier getTexture() {
@@ -481,6 +496,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         super.initDataTracker();
         dataTracker.startTracking(VARIANT, ModRegistries.OWL_VARIANT.getOrThrow(OwlVariant.WOOD_OWL_KEY));
         dataTracker.startTracking(COLLAR_COLOR, DyeColor.RED.getId());
+        dataTracker.startTracking(FROM_BUCKET, false);
     }
 
     @SuppressWarnings("DataFlowIssue")
@@ -499,6 +515,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                     .encodeStart(NbtOps.INSTANCE, homePos)
                     .result().orElse(new NbtCompound()));
         }
+        nbt.putBoolean("FromBucket", isFromBucket());
     }
 
     @Override
@@ -525,17 +542,26 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                     .decode(NbtOps.INSTANCE, nbt.getCompound("homePos"))
                     .result().map(Pair::getFirst).orElse(null);
         }
+        if (nbt.contains("FromBucket", NbtElement.NUMBER_TYPE)) {
+            setFromBucket(nbt.getBoolean("FromBucket"));
+        }
     }
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllerRegistrar) {
         controllerRegistrar.add(
                 new AnimationController<>(this, "fly/idle", 1, state -> {
-                    if (isInSittingPose()) {
-                        return state.setAndContinue(isSongPlaying() ? DANCE_ANIMATION : SIT);
+                    var moving = state.isMoving() || !isOnGround();
+
+                    if (isSongPlaying() && !moving) {
+                        return state.setAndContinue(DANCE_ANIMATION);
                     }
 
-                    return state.setAndContinue(state.isMoving() || !isOnGround() ? FLY : (isSongPlaying() ? DANCE_ANIMATION : IDLE));
+                    if (isInSittingPose()) {
+                        return state.setAndContinue(SIT);
+                    }
+
+                    return state.setAndContinue(moving ? FLY : IDLE);
                 })
         );
     }
@@ -563,5 +589,41 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
 
     public static boolean canSpawn(EntityType<OwlEntity> entityType, ServerWorldAccess world, SpawnReason spawnReason, BlockPos pos, Random random) {
         return world.getBlockState(pos.down()).isIn(BlockTags.PARROTS_SPAWNABLE_ON) && isLightLevelValidForNaturalSpawn(world, pos);
+    }
+
+    @Override
+    public boolean isFromBucket() {
+        return dataTracker.get(FROM_BUCKET);
+    }
+
+    @Override
+    public void setFromBucket(boolean fromBucket) {
+        dataTracker.set(FROM_BUCKET, fromBucket);
+    }
+
+    @Override
+    public void copyDataToStack(ItemStack stack) {
+        var nbt = stack.getOrCreateNbt();
+        var entityTag = nbt.getCompound("EntityTag");
+        writeCustomDataToNbt(entityTag);
+        nbt.put("EntityTag", entityTag);
+        if (hasCustomName()) {
+            stack.setCustomName(getCustomName());
+        }
+    }
+
+    @Override
+    public void copyDataFromNbt(NbtCompound nbt) {
+        readCustomDataFromNbt(nbt.getCompound("EntityTag"));
+    }
+
+    @Override
+    public ItemStack getBucketItem() {
+        return ModItems.OWL_BUCKET.getDefaultStack();
+    }
+
+    @Override
+    public SoundEvent getBucketFillSound() {
+        return SoundEvents.ITEM_ARMOR_EQUIP_LEATHER;
     }
 }
