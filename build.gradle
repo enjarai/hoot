@@ -63,7 +63,7 @@ dependencies {
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
-	modImplementation "software.bernie.geckolib:geckolib-fabric-1.19.3:${project.geckolib_version}"
+	modImplementation "software.bernie.geckolib:geckolib-fabric-1.20:${project.geckolib_version}"
 
 	include modImplementation("nl.enjarai:cicada-lib:${project.cicada_version}") {
 		exclude group: "net.fabricmc.fabric-api"

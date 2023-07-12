@@ -2,10 +2,10 @@
 	"schemaVersion": 1,
 	"id": "hoot",
 	"version": "${version}",
-	"name": "Under the Hoot",
+	"name": "Hoot (temporary name)",
 	"description": "This is an example description! Tell everyone what your mod is about!",
 	"authors": [
-		"Me!"
+		"enjarai"
 	],
 	"contact": {
 		"homepage": "https://fabricmc.net/",
@@ -30,7 +30,7 @@
 	],
 	"accessWidener": "hoot.accesswidener",
 	"depends": {
-		"minecraft": "~1.19.3",
+		"minecraft": "~1.20",
 		"fabric-api": "*"
 	}
 }

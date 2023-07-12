@@ -67,12 +67,11 @@ public class TravelToDestinationGoal extends Goal {
         if (entity.squaredDistanceTo(source.toCenterPos()) > teleportDistance * teleportDistance &&
                 entity.squaredDistanceTo(destination.toCenterPos()) > (teleportDistance * 2) * (teleportDistance * 2)) {
             var travelVec = source.toCenterPos().subtract(destination.toCenterPos());
-            var travelPos = new BlockPos(
-                    travelVec.normalize().multiply(teleportDistance).add(destination.toCenterPos()));
+            var travelPos = travelVec.normalize().multiply(teleportDistance).add(destination.toCenterPos());
 
             var checkRange = (int) teleportDistance;
-            for (var checkPos : BlockPos.iterateOutwards(travelPos, checkRange, checkRange, checkRange)) {
-                if (isSafe(entity.world, checkPos)) {
+            for (var checkPos : BlockPos.iterateOutwards(new BlockPos((int) travelPos.getX(), (int) travelPos.getY(), (int) travelPos.getZ()), checkRange, checkRange, checkRange)) {
+                if (isSafe(entity.getWorld(), checkPos)) {
                     entity.spawnTeleportParticles();
                     entity.teleport(checkPos.getX(), checkPos.getY(), checkPos.getZ());
                     entity.spawnTeleportParticles();

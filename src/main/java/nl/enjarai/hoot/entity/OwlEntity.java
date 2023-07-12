@@ -12,6 +12,7 @@ import net.minecraft.entity.ai.pathing.PathNodeType;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.damage.DamageSources;
 import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
@@ -38,6 +39,7 @@ import net.minecraft.util.math.GlobalPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.random.Random;
+import net.minecraft.world.EntityView;
 import net.minecraft.world.LocalDifficulty;
 import net.minecraft.world.ServerWorldAccess;
 import net.minecraft.world.World;
@@ -132,7 +134,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     @Override
     public EntityData initialize(ServerWorldAccess world, LocalDifficulty difficulty, SpawnReason spawnReason, @Nullable EntityData entityData, @Nullable NbtCompound entityNbt) {
         var biome = world.getBiome(getBlockPos());
-        setVariant(OwlVariant.fromBiome(biome));
+        setVariant(OwlVariant.fromBiome(biome, getBlockPos()));
         if (entityData == null) {
             entityData = new PassiveEntity.PassiveData(false);
         }
@@ -141,14 +143,14 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
 
     @Override
     public void tickMovement() {
-        if (this.songSource == null || !this.songSource.isWithinDistance(this.getPos(), 3.46) || !this.world.getBlockState(this.songSource).isOf(Blocks.JUKEBOX)) {
+        if (this.songSource == null || !this.songSource.isWithinDistance(this.getPos(), 3.46) || !this.getWorld().getBlockState(this.songSource).isOf(Blocks.JUKEBOX)) {
             this.songPlaying = false;
             this.songSource = null;
         }
 
         super.tickMovement();
 
-        if (!world.isClient && isAlive() && age % 10 == 0) {
+        if (!getWorld().isClient && isAlive() && age % 10 == 0) {
             heal(1.0f);
         }
 
@@ -174,7 +176,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     }
 
     public void spawnTeleportParticles() {
-        if (world instanceof ServerWorld serverWorld) {
+        if (getWorld() instanceof ServerWorld serverWorld) {
             serverWorld.spawnParticles(
                     ParticleTypes.POOF,
                     getX(), getY(), getZ(),
@@ -193,15 +195,15 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
             if (TAMING_INGREDIENTS.contains(item)) {
                 decrementStackUnlessInCreative(player, itemStack);
                 playHappySound();
-                if (!world.isClient) {
+                if (!getWorld().isClient) {
                     if (random.nextInt(5) == 0) {
                         setOwner(player);
-                        world.sendEntityStatus(this, EntityStatuses.ADD_POSITIVE_PLAYER_REACTION_PARTICLES);
+                        getWorld().sendEntityStatus(this, EntityStatuses.ADD_POSITIVE_PLAYER_REACTION_PARTICLES);
                     } else {
-                        world.sendEntityStatus(this, EntityStatuses.ADD_NEGATIVE_PLAYER_REACTION_PARTICLES);
+                        getWorld().sendEntityStatus(this, EntityStatuses.ADD_NEGATIVE_PLAYER_REACTION_PARTICLES);
                     }
                 }
-                return ActionResult.success(world.isClient);
+                return ActionResult.success(getWorld().isClient);
             }
         } else {
             var bucketResult = Bucketable.tryBucket(player, hand, this);
@@ -218,14 +220,14 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                     !getEquippedStack(EquipmentSlot.MAINHAND).isEmpty() && CompassItem.hasLodestone(itemStack)) {
                 GlobalPos lodestonePos = CompassItem.createLodestonePos(itemStack.getOrCreateNbt());
                 if (lodestonePos != null &&
-                        lodestonePos.getDimension().equals(world.getRegistryKey()) &&
+                        lodestonePos.getDimension().equals(getWorld().getRegistryKey()) &&
                         tryStartDelivery(lodestonePos.getPos().up())) {
                     playHappySound();
                 }
                 return ActionResult.SUCCESS;
             }
             if (player.isSneaking() && isOwner(player) && isDelivering()) {
-                playHurtSound(DamageSource.GENERIC);
+                playHurtSound(getDamageSources().generic());
                 showEmoteParticle(false);
                 completeDelivery(false);
                 return ActionResult.SUCCESS;
@@ -234,10 +236,10 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                 return ActionResult.SUCCESS;
             }
             if (!isInAir() && isOwner(player)) {
-                if (!world.isClient) {
+                if (!getWorld().isClient) {
                     setSitting(!isSitting());
                 }
-                return ActionResult.success(world.isClient);
+                return ActionResult.success(getWorld().isClient);
             }
         }
         return super.interactMob(player, hand);
@@ -251,7 +253,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
             stack.setCount(1);
             setStackInHand(Hand.MAIN_HAND, stack);
             decrementStackUnlessInCreative(player, playerHand);
-            world.playSoundFromEntity(
+            getWorld().playSoundFromEntity(
                     null, this,
                     SoundEvents.ITEM_ARMOR_EQUIP_LEATHER, getSoundCategory(),
                     2.0f, 1.0f
@@ -260,7 +262,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         }
         if (!owlHand.isEmpty() && hand == Hand.MAIN_HAND && playerHand.isEmpty()) {
             equipStack(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
-            world.playSoundFromEntity(
+            getWorld().playSoundFromEntity(
                     null, this,
                     SoundEvents.ITEM_ARMOR_EQUIP_LEATHER, getSoundCategory(),
                     2.0f, 1.0f
@@ -286,9 +288,9 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
             if (isLeashed() && getHoldingEntity() instanceof LeashKnotEntity knot && getHome() == null) {
                 leashedTime += 1;
                 if (leashedTime > LEASH_TIME_BEFORE_HOME) {
-                    setHome(GlobalPos.create(world.getRegistryKey(), knot.getBlockPos()));
+                    setHome(GlobalPos.create(getWorld().getRegistryKey(), knot.getBlockPos()));
                     playHappySound();
-                    world.sendEntityStatus(this, EntityStatuses.ADD_POSITIVE_PLAYER_REACTION_PARTICLES);
+                    getWorld().sendEntityStatus(this, EntityStatuses.ADD_POSITIVE_PLAYER_REACTION_PARTICLES);
                 }
             } else {
                 leashedTime = 0;
@@ -398,10 +400,10 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         if (deliveryNavigation.getState() == DeliveryNavigation.State.DELIVERING) {
             if (success) onDeliver();
 
-            if (getHome() != null && getHome().getDimension().equals(world.getRegistryKey())) {
+            if (getHome() != null && getHome().getDimension().equals(getWorld().getRegistryKey())) {
                 deliveryNavigation.setDestination(getHome().getPos());
                 deliveryNavigation.setDestinationEntityUUID(null);
-            } else if (getOwner() != null && getOwner().world.getRegistryKey().equals(world.getRegistryKey())) {
+            } else if (getOwner() != null && getOwner().getWorld().getRegistryKey().equals(getWorld().getRegistryKey())) {
                 deliveryNavigation.setDestination(getOwner().getBlockPos());
                 deliveryNavigation.setDestinationEntityUUID(getOwner().getUuid());
             } else if (deliveryNavigation.getSource().isPresent()) {
@@ -431,7 +433,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
 
     @Override
     public boolean tryAttack(Entity target) {
-        return target.damage(DamageSource.mob(this), (float) getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE));
+        return target.damage(getDamageSources().mobAttack(this), (float) getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE));
     }
 
     @Override
@@ -459,7 +461,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
 
     public void playHappySound() {
         if (!isSilent()) {
-            world.playSoundFromEntity(
+            getWorld().playSoundFromEntity(
                     null, this,
                     ModSoundEvents.ENTITY_OWL_EAT, getSoundCategory(), 1.0f,
                     1.0f + (random.nextFloat() - random.nextFloat()) * 0.2f
@@ -468,14 +470,14 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     }
 
     private void flapWings() {
-        flapSpeed += (float) (onGround || hasVehicle() ? -1 : 4) * 0.3f;
+        flapSpeed += (float) (isOnGround() || hasVehicle() ? -1 : 4) * 0.3f;
         flapSpeed = MathHelper.clamp(flapSpeed, 0.0f, 1.0f);
-        if (!onGround && flapping < 1.0f) {
+        if (!isOnGround() && flapping < 1.0f) {
             flapping = 1.0f;
         }
         flapping *= 0.9f;
         Vec3d vec3d = getVelocity();
-        if (!onGround && vec3d.y < 0.0) {
+        if (!isOnGround() && vec3d.y < 0.0) {
             setVelocity(vec3d.multiply(1.0, 0.6, 1.0));
         }
     }
@@ -625,5 +627,10 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     @Override
     public SoundEvent getBucketFillSound() {
         return SoundEvents.ITEM_ARMOR_EQUIP_LEATHER;
+    }
+
+    @Override
+    public EntityView method_48926() {
+        return getWorld();
     }
 }

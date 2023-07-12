@@ -22,7 +22,7 @@ public class ThrowAroundItemGoal extends Goal {
     }
     
     private List<ItemEntity> getItemsNear() {
-        return entity.world.getEntitiesByClass(ItemEntity.class,
+        return entity.getWorld().getEntitiesByClass(ItemEntity.class,
                 entity.getBoundingBox().expand(8.0, 8.0, 8.0), CAN_TAKE);
     }
 

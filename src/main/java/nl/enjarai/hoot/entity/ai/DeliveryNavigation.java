@@ -21,7 +21,7 @@ public class DeliveryNavigation {
                     intStream -> {
                         int[] ints = intStream.toArray();
                         return ints.length == 4 ? DataResult.success(Uuids.toUuid(ints)) :
-                                DataResult.error("Invalid UUID: " + Arrays.toString(ints));
+                                DataResult.error(() -> "Invalid UUID: " + Arrays.toString(ints));
                     },
                     uuid -> IntStream.of(Uuids.toIntArray(uuid))
             ).optionalFieldOf("destination_entity_uuid").forGetter(DeliveryNavigation::getDestinationEntityUUID),
@@ -87,7 +87,7 @@ public class DeliveryNavigation {
                 case "idle" -> DataResult.success(IDLE);
                 case "delivering" -> DataResult.success(DELIVERING);
                 case "returning" -> DataResult.success(RETURNING);
-                default -> DataResult.error("Unknown state: " + string);
+                default -> DataResult.error(() -> "Unknown state: " + string);
             };
         }
 

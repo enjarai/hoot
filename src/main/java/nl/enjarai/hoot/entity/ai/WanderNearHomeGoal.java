@@ -29,7 +29,7 @@ public class WanderNearHomeGoal extends Goal {
         if (!owl.isTamed() || owl.isLeashed()) {
             return false;
         }
-        if (owl.getHome() == null || !owl.getHome().getDimension().equals(owl.world.getRegistryKey())) {
+        if (owl.getHome() == null || !owl.getHome().getDimension().equals(owl.getWorld().getRegistryKey())) {
             return false;
         }
         target = owl.getHome().getPos();

@@ -4,6 +4,7 @@ import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.biome.Biome;
 import nl.enjarai.hoot.Hoot;
 import nl.enjarai.hoot.registry.ModRegistries;
@@ -28,7 +29,7 @@ public record OwlVariant(Identifier texture) {
         return Registry.register(registry, key, new OwlVariant(Hoot.id(textureId)));
     }
 
-    public static OwlVariant fromBiome(RegistryEntry<Biome> biome) {
-        return biome.value().getPrecipitation() == Biome.Precipitation.SNOW ? SNOW_OWL : WOOD_OWL;
+    public static OwlVariant fromBiome(RegistryEntry<Biome> biome, BlockPos pos) {
+        return biome.value().getPrecipitation(pos) == Biome.Precipitation.SNOW ? SNOW_OWL : WOOD_OWL;
     }
 }
