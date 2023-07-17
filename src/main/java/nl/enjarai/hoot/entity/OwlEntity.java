@@ -4,6 +4,7 @@ import com.mojang.datafixers.util.Pair;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.*;
+import net.minecraft.entity.ai.TargetPredicate;
 import net.minecraft.entity.ai.control.FlightMoveControl;
 import net.minecraft.entity.ai.goal.*;
 import net.minecraft.entity.ai.pathing.BirdNavigation;
@@ -216,13 +217,24 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                 decrementStackUnlessInCreative(player, itemStack);
                 return ActionResult.SUCCESS;
             }
-            if (item == Items.COMPASS && isOwner(player) &&
-                    !getEquippedStack(EquipmentSlot.MAINHAND).isEmpty() && CompassItem.hasLodestone(itemStack)) {
+            if (item == Items.COMPASS && !getEquippedStack(EquipmentSlot.MAINHAND).isEmpty() && CompassItem.hasLodestone(itemStack)) {
                 GlobalPos lodestonePos = CompassItem.createLodestonePos(itemStack.getOrCreateNbt());
                 if (lodestonePos != null &&
                         lodestonePos.getDimension().equals(getWorld().getRegistryKey()) &&
                         tryStartDelivery(lodestonePos.getPos().up())) {
                     playHappySound();
+                }
+                return ActionResult.SUCCESS;
+            }
+            if (item == Items.PAPER && !getEquippedStack(EquipmentSlot.MAINHAND).isEmpty() && itemStack.hasCustomName()) {
+                if (!getWorld().isClient()) {
+                    var name = itemStack.getName().getString();
+                    var targetPlayer = getWorld().getPlayers().stream().filter(p -> p.getGameProfile().getName().equals(name)).findFirst();
+                    if (targetPlayer.isPresent() && tryStartDelivery(targetPlayer.get())) {
+                        playHappySound();
+                    } else {
+                        showEmoteParticle(false);
+                    }
                 }
                 return ActionResult.SUCCESS;
             }
@@ -285,7 +297,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     public void updateLeash() {
         super.updateLeash();
         if (isTamed()) {
-            if (isLeashed() && getHoldingEntity() instanceof LeashKnotEntity knot && getHome() == null) {
+            if (isLeashed() && getHoldingEntity() instanceof LeashKnotEntity knot) {
                 leashedTime += 1;
                 if (leashedTime > LEASH_TIME_BEFORE_HOME) {
                     setHome(GlobalPos.create(getWorld().getRegistryKey(), knot.getBlockPos()));
@@ -403,12 +415,12 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
             if (getHome() != null && getHome().getDimension().equals(getWorld().getRegistryKey())) {
                 deliveryNavigation.setDestination(getHome().getPos());
                 deliveryNavigation.setDestinationEntityUUID(null);
-            } else if (getOwner() != null && getOwner().getWorld().getRegistryKey().equals(getWorld().getRegistryKey())) {
-                deliveryNavigation.setDestination(getOwner().getBlockPos());
-                deliveryNavigation.setDestinationEntityUUID(getOwner().getUuid());
             } else if (deliveryNavigation.getSource().isPresent()) {
                 deliveryNavigation.setDestination(deliveryNavigation.getSource().get());
                 deliveryNavigation.setDestinationEntityUUID(null);
+            } else if (getOwner() != null && getOwner().getWorld().getRegistryKey().equals(getWorld().getRegistryKey())) {
+                deliveryNavigation.setDestination(getOwner().getBlockPos());
+                deliveryNavigation.setDestinationEntityUUID(getOwner().getUuid());
             }
 
             deliveryNavigation.setSource(getBlockPos());
