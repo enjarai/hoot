@@ -180,12 +180,12 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
     public void onReturn() {
     }
 
-    public void spawnTeleportParticles() {
+    public void spawnTeleportParticles(boolean acrossDimensions) {
         if (getWorld() instanceof ServerWorld serverWorld) {
             serverWorld.spawnParticles(
-                    ParticleTypes.POOF,
+                    acrossDimensions ? ParticleTypes.PORTAL : ParticleTypes.POOF,
                     getX(), getY(), getZ(),
-                    10,
+                    acrossDimensions ? 100 : 10,
                     0.5, 0.5, 0.5,
                     0.0
             );
@@ -235,8 +235,8 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                 if (item == Items.COMPASS && !getEquippedStack(EquipmentSlot.MAINHAND).isEmpty() && CompassItem.hasLodestone(itemStack)) {
                     GlobalPos lodestonePos = CompassItem.createLodestonePos(itemStack.getOrCreateNbt());
                     if (lodestonePos != null &&
-                            lodestonePos.getDimension().equals(getWorld().getRegistryKey()) &&
-                            tryStartDelivery(lodestonePos.getPos().up())) {
+                            (this.getVariant() == OwlVariant.INTERDIMENSIONAL_OWL || lodestonePos.getDimension().equals(getWorld().getRegistryKey())) &&
+                            tryStartDelivery(GlobalPos.create(lodestonePos.getDimension(), lodestonePos.getPos().up()))) {
                         playHappySound();
                     }
                     return ActionResult.SUCCESS;
@@ -244,13 +244,23 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                 if (item == Items.PAPER && !getEquippedStack(EquipmentSlot.MAINHAND).isEmpty() && itemStack.hasCustomName()) {
                     if (!getWorld().isClient()) {
                         var name = itemStack.getName().getString();
-                        var targetPlayer = getWorld().getPlayers().stream().filter(p -> p.getGameProfile().getName().equals(name)).findFirst();
+                        var stream = getWorld().getServer().getPlayerManager().getPlayerList().stream();
+                        if (this.getVariant() != OwlVariant.INTERDIMENSIONAL_OWL) {
+                            stream = stream.filter(streamPlayer -> streamPlayer.getWorld() == getWorld());
+                        }
+                        var targetPlayer = stream.filter(p -> p.getGameProfile().getName().equals(name)).findFirst();
+
                         if (targetPlayer.isPresent() && tryStartDelivery(targetPlayer.get())) {
                             playHappySound();
                         } else {
                             showEmoteParticle(false);
                         }
                     }
+                    return ActionResult.SUCCESS;
+                }
+                if (item == Items.ENDER_EYE && getEquippedStack(EquipmentSlot.MAINHAND).isEmpty()) {
+                    this.setVariant(OwlVariant.INTERDIMENSIONAL_OWL);
+                    this.spawnTeleportParticles(true);
                     return ActionResult.SUCCESS;
                 }
 //                if (!isInAir() && isOwner(player)) {
@@ -390,9 +400,9 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         homePos = pos;
     }
 
-    public boolean tryStartDelivery(BlockPos destination) {
+    public boolean tryStartDelivery(GlobalPos destination) {
         if (!isDelivering()) {
-            deliveryNavigation.setSource(getBlockPos());
+            deliveryNavigation.setSource(DeliveryNavigation.entityPos(this));
             deliveryNavigation.setDestination(destination);
             deliveryNavigation.setState(DeliveryNavigation.State.DELIVERING);
             setSitting(false);
@@ -404,9 +414,9 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
 
     public boolean tryStartDelivery(Entity target) {
         if (!isDelivering()) {
-            deliveryNavigation.setSource(getBlockPos());
+            deliveryNavigation.setSource(DeliveryNavigation.entityPos(this));
             deliveryNavigation.setDestinationEntityUUID(target.getUuid());
-            deliveryNavigation.setDestination(target.getBlockPos());
+            deliveryNavigation.setDestination(DeliveryNavigation.entityPos(target));
             deliveryNavigation.setState(DeliveryNavigation.State.DELIVERING);
             setSitting(false);
 
@@ -423,18 +433,20 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         if (deliveryNavigation.getState() == DeliveryNavigation.State.DELIVERING) {
             if (success) onDeliver();
 
-            if (getHome() != null && getHome().getDimension().equals(getWorld().getRegistryKey())) {
-                deliveryNavigation.setDestination(getHome().getPos());
+            if (getHome() != null && (this.getVariant() == OwlVariant.INTERDIMENSIONAL_OWL ||
+                    getHome().getDimension().equals(getWorld().getRegistryKey()))) {
+                deliveryNavigation.setDestination(getHome());
                 deliveryNavigation.setDestinationEntityUUID(null);
             } else if (deliveryNavigation.getSource().isPresent()) {
                 deliveryNavigation.setDestination(deliveryNavigation.getSource().get());
                 deliveryNavigation.setDestinationEntityUUID(null);
-            } else if (getOwner() != null && getOwner().getWorld().getRegistryKey().equals(getWorld().getRegistryKey())) {
-                deliveryNavigation.setDestination(getOwner().getBlockPos());
+            } else if (getOwner() != null && (this.getVariant() == OwlVariant.INTERDIMENSIONAL_OWL ||
+                    getOwner().getWorld().getRegistryKey().equals(getWorld().getRegistryKey()))) {
+                deliveryNavigation.setDestination(DeliveryNavigation.entityPos(getOwner()));
                 deliveryNavigation.setDestinationEntityUUID(getOwner().getUuid());
             }
 
-            deliveryNavigation.setSource(getBlockPos());
+            deliveryNavigation.setSource(DeliveryNavigation.entityPos(this));
             deliveryNavigation.setState(DeliveryNavigation.State.RETURNING);
         } else if (deliveryNavigation.getState() == DeliveryNavigation.State.RETURNING) {
             if (success) onReturn();
