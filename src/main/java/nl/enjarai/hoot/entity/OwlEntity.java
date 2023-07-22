@@ -103,12 +103,13 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         goalSelector.add(0, new SwimGoal(this));
         goalSelector.add(1, new LookAtEntityGoal(this, PlayerEntity.class, 8.0f));
         goalSelector.add(2, new SitGoal(this));
-        goalSelector.add(3, new TravelToDestinationGoal(this, 1.5, 8));
-        goalSelector.add(4, new MeleeAttackGoal(this, 1.0, false));
-        goalSelector.add(5, new ThrowAroundItemGoal(this));
-        goalSelector.add(6, new WanderNearHomeGoal(this, 1.0, 14));
+        goalSelector.add(3, new AnimalMateGoal(this, 1.0));
+        goalSelector.add(4, new TravelToDestinationGoal(this, 1.5, 8));
+        goalSelector.add(5, new MeleeAttackGoal(this, 1.0, false));
+        goalSelector.add(6, new ThrowAroundItemGoal(this));
+        goalSelector.add(7, new WanderNearHomeGoal(this, 1.0, 14));
 //        goalSelector.add(4, new FollowOwnerGoal(this, 1.0, 5.0f, 1.0f, true));
-        goalSelector.add(6, new ParrotEntity.FlyOntoTreeGoal(this, 1.0));
+        goalSelector.add(7, new ParrotEntity.FlyOntoTreeGoal(this, 1.0));
 //        goalSelector.add(6, new FollowMobGoal(this, 1.0, 3.0f, 7.0f));
         targetSelector.add(1, new TrackOwnerAttackerGoal(this));
         targetSelector.add(2, new AttackWithOwnerGoal(this));
