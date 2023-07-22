@@ -3,9 +3,12 @@ package nl.enjarai.hoot.entity.ai;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.entity.Entity;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.util.Uuids;
 import net.minecraft.util.dynamic.Codecs;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.GlobalPos;
 
 import java.util.Arrays;
 import java.util.Optional;
@@ -15,8 +18,8 @@ import java.util.stream.IntStream;
 @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
 public class DeliveryNavigation {
     public static final Codec<DeliveryNavigation> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            BlockPos.CODEC.optionalFieldOf("source").forGetter(DeliveryNavigation::getSource),
-            BlockPos.CODEC.optionalFieldOf("destination").forGetter(DeliveryNavigation::getDestination),
+            GlobalPos.CODEC.optionalFieldOf("source").forGetter(DeliveryNavigation::getSource),
+            GlobalPos.CODEC.optionalFieldOf("destination").forGetter(DeliveryNavigation::getDestination),
             Codec.INT_STREAM.comapFlatMap(
                     intStream -> {
                         int[] ints = intStream.toArray();
@@ -28,34 +31,38 @@ public class DeliveryNavigation {
             State.CODEC.fieldOf("state").forGetter(DeliveryNavigation::getState)
     ).apply(instance, DeliveryNavigation::new));
 
-    private BlockPos source;
-    private BlockPos destination;
+    private GlobalPos source;
+    private GlobalPos destination;
     private UUID destinationEntityUUID;
     private State state = State.IDLE;
 
     public DeliveryNavigation() {
     }
 
-    public DeliveryNavigation(Optional<BlockPos> source, Optional<BlockPos> destination, Optional<UUID> destinationEntityUUID, State state) {
+    public DeliveryNavigation(Optional<GlobalPos> source, Optional<GlobalPos> destination, Optional<UUID> destinationEntityUUID, State state) {
         this.source = source.orElse(null);
         this.destination = destination.orElse(null);
         this.destinationEntityUUID = destinationEntityUUID.orElse(null);
         this.state = state;
     }
 
-    public Optional<BlockPos> getSource() {
+    public static GlobalPos entityPos(Entity entity) {
+        return GlobalPos.create(entity.getWorld().getRegistryKey(), entity.getBlockPos());
+    }
+
+    public Optional<GlobalPos> getSource() {
         return Optional.ofNullable(source);
     }
 
-    public void setSource(BlockPos source) {
+    public void setSource(GlobalPos source) {
         this.source = source;
     }
 
-    public Optional<BlockPos> getDestination() {
+    public Optional<GlobalPos> getDestination() {
         return Optional.ofNullable(destination);
     }
 
-    public void setDestination(BlockPos destination) {
+    public void setDestination(GlobalPos destination) {
         this.destination = destination;
     }
 
