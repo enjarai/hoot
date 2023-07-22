@@ -33,7 +33,8 @@ public class WanderNearHomeGoal extends Goal {
             return false;
         }
         target = owl.getHome().getPos();
-        if (owl.squaredDistanceTo(target.toCenterPos()) < maxDistance * maxDistance) {
+        var squaredDistance = owl.squaredDistanceTo(target.toCenterPos());
+        if (squaredDistance < maxDistance * maxDistance || squaredDistance > maxDistance * maxDistance * 4) {
             return false;
         }
 //        Vec3d vec3d = NoPenaltyTargeting.findTo(owl, 16, 7, target.toCenterPos(), 1.5);

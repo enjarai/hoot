@@ -154,6 +154,9 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
 
         if (!getWorld().isClient && isAlive() && age % 10 == 0) {
             heal(1.0f);
+
+            // TODO: maybe not keep this here
+            setSitting(false);
         }
 
         flapWings();
@@ -208,51 +211,54 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                 return ActionResult.success(getWorld().isClient);
             }
         } else {
-            var bucketResult = Bucketable.tryBucket(player, hand, this);
-            if (bucketResult.isPresent()) return bucketResult.get();
+            if (player.isSneaking()) {
+                if (isDelivering()) {
+                    playHurtSound(getDamageSources().generic());
+                    showEmoteParticle(false);
+                    completeDelivery(false);
+                    return ActionResult.SUCCESS;
+                }
+                if (replaceHeldItem(player, hand)){
+                    return ActionResult.SUCCESS;
+                }
+            } else {
+                var bucketResult = Bucketable.tryBucket(player, hand, this);
+                if (bucketResult.isPresent()) return bucketResult.get();
 
-            if (item instanceof DyeItem dye) {
-                DyeColor dyeColor = dye.getColor();
-                if (dyeColor == getCollarColor()) return super.interactMob(player, hand);
-                setCollarColor(dyeColor);
-                decrementStackUnlessInCreative(player, itemStack);
-                return ActionResult.SUCCESS;
-            }
-            if (item == Items.COMPASS && !getEquippedStack(EquipmentSlot.MAINHAND).isEmpty() && CompassItem.hasLodestone(itemStack)) {
-                GlobalPos lodestonePos = CompassItem.createLodestonePos(itemStack.getOrCreateNbt());
-                if (lodestonePos != null &&
-                        lodestonePos.getDimension().equals(getWorld().getRegistryKey()) &&
-                        tryStartDelivery(lodestonePos.getPos().up())) {
-                    playHappySound();
+                if (item instanceof DyeItem dye) {
+                    DyeColor dyeColor = dye.getColor();
+                    if (dyeColor == getCollarColor()) return super.interactMob(player, hand);
+                    setCollarColor(dyeColor);
+                    decrementStackUnlessInCreative(player, itemStack);
+                    return ActionResult.SUCCESS;
                 }
-                return ActionResult.SUCCESS;
-            }
-            if (item == Items.PAPER && !getEquippedStack(EquipmentSlot.MAINHAND).isEmpty() && itemStack.hasCustomName()) {
-                if (!getWorld().isClient()) {
-                    var name = itemStack.getName().getString();
-                    var targetPlayer = getWorld().getPlayers().stream().filter(p -> p.getGameProfile().getName().equals(name)).findFirst();
-                    if (targetPlayer.isPresent() && tryStartDelivery(targetPlayer.get())) {
+                if (item == Items.COMPASS && !getEquippedStack(EquipmentSlot.MAINHAND).isEmpty() && CompassItem.hasLodestone(itemStack)) {
+                    GlobalPos lodestonePos = CompassItem.createLodestonePos(itemStack.getOrCreateNbt());
+                    if (lodestonePos != null &&
+                            lodestonePos.getDimension().equals(getWorld().getRegistryKey()) &&
+                            tryStartDelivery(lodestonePos.getPos().up())) {
                         playHappySound();
-                    } else {
-                        showEmoteParticle(false);
                     }
+                    return ActionResult.SUCCESS;
                 }
-                return ActionResult.SUCCESS;
-            }
-            if (player.isSneaking() && isOwner(player) && isDelivering()) {
-                playHurtSound(getDamageSources().generic());
-                showEmoteParticle(false);
-                completeDelivery(false);
-                return ActionResult.SUCCESS;
-            }
-            if (replaceHeldItem(player, hand)) {
-                return ActionResult.SUCCESS;
-            }
-            if (!isInAir() && isOwner(player)) {
-                if (!getWorld().isClient) {
-                    setSitting(!isSitting());
+                if (item == Items.PAPER && !getEquippedStack(EquipmentSlot.MAINHAND).isEmpty() && itemStack.hasCustomName()) {
+                    if (!getWorld().isClient()) {
+                        var name = itemStack.getName().getString();
+                        var targetPlayer = getWorld().getPlayers().stream().filter(p -> p.getGameProfile().getName().equals(name)).findFirst();
+                        if (targetPlayer.isPresent() && tryStartDelivery(targetPlayer.get())) {
+                            playHappySound();
+                        } else {
+                            showEmoteParticle(false);
+                        }
+                    }
+                    return ActionResult.SUCCESS;
                 }
-                return ActionResult.success(getWorld().isClient);
+//                if (!isInAir() && isOwner(player)) {
+//                    if (!getWorld().isClient) {
+//                        setSitting(!isSitting());
+//                    }
+//                    return ActionResult.success(getWorld().isClient);
+//                }
             }
         }
         return super.interactMob(player, hand);
@@ -301,9 +307,12 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
             if (isLeashed() && getHoldingEntity() instanceof LeashKnotEntity knot) {
                 leashedTime += 1;
                 if (leashedTime > LEASH_TIME_BEFORE_HOME) {
-                    setHome(GlobalPos.create(getWorld().getRegistryKey(), knot.getBlockPos()));
-                    playHappySound();
-                    getWorld().sendEntityStatus(this, EntityStatuses.ADD_POSITIVE_PLAYER_REACTION_PARTICLES);
+                    var currentHome = getHome();
+                    if (currentHome == null || !currentHome.getPos().equals(knot.getBlockPos()) || !currentHome.getDimension().equals(getWorld().getRegistryKey())) {
+                        setHome(GlobalPos.create(getWorld().getRegistryKey(), knot.getBlockPos()));
+                        playHappySound();
+                        getWorld().sendEntityStatus(this, EntityStatuses.ADD_POSITIVE_PLAYER_REACTION_PARTICLES);
+                    }
                 }
             } else {
                 leashedTime = 0;
@@ -346,6 +355,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         if (owl == null) return null;
 
         owl.setVariant(random.nextBoolean() ? getVariant() : ((OwlEntity) entity).getVariant());
+        owl.setHome(GlobalPos.create(world.getRegistryKey(), entity.getBlockPos()));
         return owl;
     }
 
