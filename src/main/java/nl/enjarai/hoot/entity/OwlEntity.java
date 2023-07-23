@@ -564,6 +564,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                     .result().orElse(new NbtCompound()));
         }
         nbt.putBoolean("FromBucket", isFromBucket());
+        nbt.putBoolean("Interdimensional", isInterdimensional());
     }
 
     @Override
@@ -592,6 +593,9 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         }
         if (nbt.contains("FromBucket", NbtElement.NUMBER_TYPE)) {
             setFromBucket(nbt.getBoolean("FromBucket"));
+        }
+        if (nbt.contains("Interdimensional", NbtElement.NUMBER_TYPE)) {
+            setInterdimensional(nbt.getBoolean("Interdimensional"));
         }
     }
 
