@@ -64,7 +64,7 @@ public class TravelToDestinationGoal extends Goal {
         var source = nav.getSource().get();
         var sourcePos = source.getPos();
 
-        if (entity.getVariant() == OwlVariant.INTERDIMENSIONAL_OWL && !entity.getWorld().getRegistryKey().equals(destination.getDimension())) { // before a teleport
+        if (entity.isInterdimensional() && !entity.getWorld().getRegistryKey().equals(destination.getDimension())) { // before a teleport
             entity.getNavigation().startMovingTo(entity.getX(), 4096 + 1 + teleportDistance, entity.getZ(), speed); // 4096 = max possible world height, so it will always move upwards
         } else {
             entity.getNavigation().startMovingTo(destinationPos.getX(), destinationPos.getY(), destinationPos.getZ(), speed);
@@ -75,7 +75,7 @@ public class TravelToDestinationGoal extends Goal {
             return;
         }
 
-        boolean isTeleportingAcrossDimensions = entity.getVariant() == OwlVariant.INTERDIMENSIONAL_OWL &&
+        boolean isTeleportingAcrossDimensions = entity.isInterdimensional() &&
                 source.getDimension().equals(entity.getWorld().getRegistryKey()) &&
                 !destination.getDimension().equals(entity.getWorld().getRegistryKey());
 
