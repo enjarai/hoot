@@ -20,6 +20,8 @@ public class OwlEntityRenderer extends GeoEntityRenderer<OwlEntity> {
     public static final Identifier COLLAR_TEXTURE = new Identifier("hoot", "textures/entity/owl/collar.png");
     public static final Identifier HOME_COLLAR_TEXTURE = new Identifier("hoot", "textures/entity/owl/home_collar.png");
 
+    public static final Identifier EYES_TEXTURE = new Identifier("hoot", "textures/entity/owl/eyes.png");
+
     public OwlEntityRenderer(EntityRendererFactory.Context renderManager) {
         super(renderManager, new OwlEntityModel());
         addRenderLayer(new CollarGeoLayer<>(this) {
@@ -36,6 +38,17 @@ public class OwlEntityRenderer extends GeoEntityRenderer<OwlEntity> {
             @Override
             protected boolean shouldRender(OwlEntity animatable) {
                 return animatable.isTamed();
+            }
+        });
+        addRenderLayer(new EyesGeoLayer<>(this) {
+            @Override
+            protected Identifier getTextureResource(OwlEntity animatable) {
+                return EYES_TEXTURE;
+            }
+
+            @Override
+            protected boolean shouldRender(OwlEntity animatable) {
+                return animatable.isInterdimensional();
             }
         });
 //        addRenderLayer(new CollarGeoLayer<>(this) {

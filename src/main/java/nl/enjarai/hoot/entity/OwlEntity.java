@@ -71,6 +71,8 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
             DataTracker.registerData(OwlEntity.class, TrackedDataHandlerRegistry.INTEGER);
     private static final TrackedData<Boolean> FROM_BUCKET =
             DataTracker.registerData(OwlEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
+    private static final TrackedData<Boolean> INTERDIMENSIONAL =
+            DataTracker.registerData(OwlEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
 
 
     private static final Set<Item> TAMING_INGREDIENTS = Set.of(Items.RABBIT);
@@ -235,7 +237,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                 if (item == Items.COMPASS && !getEquippedStack(EquipmentSlot.MAINHAND).isEmpty() && CompassItem.hasLodestone(itemStack)) {
                     GlobalPos lodestonePos = CompassItem.createLodestonePos(itemStack.getOrCreateNbt());
                     if (lodestonePos != null &&
-                            (this.getVariant() == OwlVariant.INTERDIMENSIONAL_OWL || lodestonePos.getDimension().equals(getWorld().getRegistryKey())) &&
+                            (this.isInterdimensional() || lodestonePos.getDimension().equals(getWorld().getRegistryKey())) &&
                             tryStartDelivery(GlobalPos.create(lodestonePos.getDimension(), lodestonePos.getPos().up()))) {
                         playHappySound();
                     }
@@ -245,7 +247,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                     if (!getWorld().isClient()) {
                         var name = itemStack.getName().getString();
                         var stream = getWorld().getServer().getPlayerManager().getPlayerList().stream();
-                        if (this.getVariant() != OwlVariant.INTERDIMENSIONAL_OWL) {
+                        if (!this.isInterdimensional()) {
                             stream = stream.filter(streamPlayer -> streamPlayer.getWorld() == getWorld());
                         }
                         var targetPlayer = stream.filter(p -> p.getGameProfile().getName().equals(name)).findFirst();
@@ -259,7 +261,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
                     return ActionResult.SUCCESS;
                 }
                 if (item == Items.ENDER_EYE && getEquippedStack(EquipmentSlot.MAINHAND).isEmpty()) {
-                    this.setVariant(OwlVariant.INTERDIMENSIONAL_OWL);
+                    this.setInterdimensional(true);
                     this.spawnTeleportParticles(true);
                     return ActionResult.SUCCESS;
                 }
@@ -391,6 +393,14 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         dataTracker.set(COLLAR_COLOR, color.getId());
     }
 
+    public boolean isInterdimensional() {
+        return dataTracker.get(INTERDIMENSIONAL);
+    }
+
+    public void setInterdimensional(boolean interdimensional) {
+        dataTracker.set(INTERDIMENSIONAL, interdimensional);
+    }
+
     @Nullable
     public GlobalPos getHome() {
         return homePos;
@@ -433,14 +443,14 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         if (deliveryNavigation.getState() == DeliveryNavigation.State.DELIVERING) {
             if (success) onDeliver();
 
-            if (getHome() != null && (this.getVariant() == OwlVariant.INTERDIMENSIONAL_OWL ||
+            if (getHome() != null && (this.isInterdimensional()||
                     getHome().getDimension().equals(getWorld().getRegistryKey()))) {
                 deliveryNavigation.setDestination(getHome());
                 deliveryNavigation.setDestinationEntityUUID(null);
             } else if (deliveryNavigation.getSource().isPresent()) {
                 deliveryNavigation.setDestination(deliveryNavigation.getSource().get());
                 deliveryNavigation.setDestinationEntityUUID(null);
-            } else if (getOwner() != null && (this.getVariant() == OwlVariant.INTERDIMENSIONAL_OWL ||
+            } else if (getOwner() != null && (this.isInterdimensional() ||
                     getOwner().getWorld().getRegistryKey().equals(getWorld().getRegistryKey()))) {
                 deliveryNavigation.setDestination(DeliveryNavigation.entityPos(getOwner()));
                 deliveryNavigation.setDestinationEntityUUID(getOwner().getUuid());
@@ -534,6 +544,7 @@ public class OwlEntity extends TameableEntity implements GeoEntity, VariantHolde
         dataTracker.startTracking(VARIANT, ModRegistries.OWL_VARIANT.getOrThrow(OwlVariant.WOOD_OWL_KEY));
         dataTracker.startTracking(COLLAR_COLOR, DyeColor.RED.getId());
         dataTracker.startTracking(FROM_BUCKET, false);
+        dataTracker.startTracking(INTERDIMENSIONAL, false);
     }
 
     @SuppressWarnings("DataFlowIssue")

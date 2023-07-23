@@ -12,19 +12,14 @@ import software.bernie.geckolib.core.animatable.GeoAnimatable;
 import software.bernie.geckolib.renderer.GeoRenderer;
 import software.bernie.geckolib.renderer.layer.GeoRenderLayer;
 
-public class CollarGeoLayer<T extends GeoAnimatable> extends GeoRenderLayer<T> {
-    public static final float[] WHITE = new float[]{1, 1, 1};
+public class EyesGeoLayer<T extends GeoAnimatable> extends GeoRenderLayer<T> {
 
-    public CollarGeoLayer(GeoRenderer<T> renderer) {
+    public EyesGeoLayer(GeoRenderer<T> renderer) {
         super(renderer);
     }
 
     protected RenderLayer getRenderType(T animatable) {
         return RenderLayer.getEntityCutoutNoCull(getTextureResource(animatable));
-    }
-
-    protected float[] getColor(T animatable) {
-        return WHITE;
     }
 
     protected boolean shouldRender(T animatable) {
@@ -36,10 +31,9 @@ public class CollarGeoLayer<T extends GeoAnimatable> extends GeoRenderLayer<T> {
         if (!shouldRender(animatable)) return;
 
         RenderLayer layer = getRenderType(animatable);
-        float[] color = getColor(animatable);
 
         getRenderer().reRender(bakedModel, poseStack, bufferSource, animatable, layer,
                 bufferSource.getBuffer(layer), partialTick, 15728640, OverlayTexture.DEFAULT_UV,
-                color[0], color[1], color[2], 1);
+                1, 1, 1, 1);
     }
 }
